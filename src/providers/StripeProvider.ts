@@ -1,12 +1,27 @@
-const axios = require('axios');
-const crypto = require('crypto');
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
+import axios, { AxiosInstance } from 'axios';
+import crypto from 'crypto';
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
+import { 
+  IPaymentProvider, 
+  IPaymentInitData, 
+  IPaymentInitResponse, 
+  IPaymentVerificationResponse,
+  IPayoutData,
+  IPayoutResponse,
+  IWebhookEvent,
+  IBank,
+  IAccountResolution,
+  IProviderConfig
+} from '@/types';
 
-class StripeProvider {
-  constructor(config) {
+class StripeProvider implements IPaymentProvider {
+  private config: IProviderConfig;
+  private baseURL: string = 'https://api.stripe.com/v1';
+  private client: AxiosInstance;
+
+  constructor(config: IProviderConfig) {
     this.config = config;
-    this.baseURL = 'https://api.stripe.com/v1';
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -17,19 +32,19 @@ class StripeProvider {
     });
   }
 
-  async initializePayment(data) {
+  async initializePayment(data: IPaymentInitData): Promise<IPaymentInitResponse> {
     try {
       const { amount, currency, reference, email, metadata } = data;
       
       // Create payment intent
       const payload = new URLSearchParams({
-        amount: amount, // Stripe expects amount in cents/minor currency unit
+        amount: amount.toString(), // Stripe expects amount in cents/minor currency unit
         currency: currency.toLowerCase(),
         'metadata[reference]': reference,
         'metadata[email]': email,
         automatic_payment_methods: 'enabled',
         confirmation_method: 'manual',
-        confirm: false
+        confirm: 'false'
       });
 
       // Add metadata
@@ -50,7 +65,7 @@ class StripeProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Stripe payment initialization failed:', error);
       if (error.response) {
         throw new AppError(`Stripe error: ${error.response.data.error.message}`, 400);
@@ -59,7 +74,7 @@ class StripeProvider {
     }
   }
 
-  async verifyPayment(paymentIntentId) {
+  async verifyPayment(paymentIntentId: string): Promise<IPaymentVerificationResponse> {
     try {
       const response = await this.client.get(`/payment_intents/${paymentIntentId}`);
       
@@ -70,12 +85,12 @@ class StripeProvider {
         status: paymentIntent.status === 'succeeded' ? 'completed' : 'failed',
         amount: paymentIntent.amount,
         currency: paymentIntent.currency.toUpperCase(),
-        paidAt: paymentIntent.created,
+        paidAt: paymentIntent.created.toString(),
         channel: 'card',
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Stripe payment verification failed:', error);
       if (error.response) {
         throw new AppError(`Stripe error: ${error.response.data.error.message}`, 400);
@@ -84,7 +99,7 @@ class StripeProvider {
     }
   }
 
-  async initiatePayout(data) {
+  async initiatePayout(data: IPayoutData): Promise<IPayoutResponse> {
     try {
       const { amount, currency, reference, bankDetails } = data;
       
@@ -102,7 +117,7 @@ class StripeProvider {
       
       // Create transfer
       const transferPayload = new URLSearchParams({
-        amount: amount,
+        amount: amount.toString(),
         currency: currency.toLowerCase(),
         destination: accountResponse.data.id,
         'metadata[reference]': reference
@@ -118,7 +133,7 @@ class StripeProvider {
         providerResponse: transferResponse.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Stripe payout failed:', error);
       if (error.response) {
         throw new AppError(`Stripe error: ${error.response.data.error.message}`, 400);
@@ -127,11 +142,11 @@ class StripeProvider {
     }
   }
 
-  async verifyWebhook(payload, signature) {
+  async verifyWebhook(payload: any, signature: string): Promise<boolean> {
     try {
       const elements = signature.split(',');
-      let timestamp;
-      let signatures = [];
+      let timestamp: string | undefined;
+      let signatures: string[] = [];
 
       for (const element of elements) {
         const [key, value] = element.split('=');
@@ -148,7 +163,7 @@ class StripeProvider {
 
       const payloadForSignature = `${timestamp}.${JSON.stringify(payload)}`;
       const expectedSignature = crypto
-        .createHmac('sha256', this.config.webhookSecret)
+        .createHmac('sha256', this.config.webhookSecret!)
         .update(payloadForSignature)
         .digest('hex');
 
@@ -162,10 +177,10 @@ class StripeProvider {
     }
   }
 
-  parseWebhookEvent(payload) {
+  parseWebhookEvent(payload: any): IWebhookEvent {
     const { type, data } = payload;
     
-    let status;
+    let status: 'success' | 'failed' | 'pending';
     switch (data.object.status) {
       case 'succeeded':
         status = 'success';
@@ -190,21 +205,21 @@ class StripeProvider {
   }
 
   // Stripe doesn't have a direct bank list API for all countries
-  async getBanks() {
+  async getBanks(): Promise<IBank[]> {
     // This would typically be handled differently for Stripe
     // as it uses different routing numbers per country
     return [];
   }
 
-  async resolveAccountNumber(accountNumber, routingNumber) {
+  async resolveAccountNumber(accountNumber: string, routingNumber: string): Promise<IAccountResolution> {
     // Stripe handles account validation differently
     // This is typically done during the payment/transfer flow
     return {
       accountNumber: accountNumber,
-      routingNumber: routingNumber,
-      accountName: 'Validated Account' // Placeholder
+      accountName: 'Validated Account', // Placeholder
+      bankCode: routingNumber
     };
   }
 }
 
-module.exports = StripeProvider;
+export default StripeProvider;

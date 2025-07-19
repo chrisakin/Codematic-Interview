@@ -1,12 +1,29 @@
-const axios = require('axios');
-const crypto = require('crypto');
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
+import axios, { AxiosInstance } from 'axios';
+import crypto from 'crypto';
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
+import { 
+  IPaymentProvider, 
+  IPaymentInitData, 
+  IPaymentInitResponse, 
+  IPaymentVerificationResponse,
+  IPayoutData,
+  IPayoutResponse,
+  IVirtualAccountData,
+  IVirtualAccountResponse,
+  IWebhookEvent,
+  IBank,
+  IAccountResolution,
+  IProviderConfig
+} from '@/types';
 
-class FlutterwaveProvider {
-  constructor(config) {
+class FlutterwaveProvider implements IPaymentProvider {
+  private config: IProviderConfig;
+  private baseURL: string = 'https://api.flutterwave.com/v3';
+  private client: AxiosInstance;
+
+  constructor(config: IProviderConfig) {
     this.config = config;
-    this.baseURL = 'https://api.flutterwave.com/v3';
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -17,7 +34,7 @@ class FlutterwaveProvider {
     });
   }
 
-  async initializePayment(data) {
+  async initializePayment(data: IPaymentInitData): Promise<IPaymentInitResponse> {
     try {
       const { amount, currency, reference, email, metadata } = data;
       
@@ -51,7 +68,7 @@ class FlutterwaveProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Flutterwave payment initialization failed:', error);
       if (error.response) {
         throw new AppError(`Flutterwave error: ${error.response.data.message}`, 400);
@@ -60,7 +77,7 @@ class FlutterwaveProvider {
     }
   }
 
-  async verifyPayment(transactionId) {
+  async verifyPayment(transactionId: string): Promise<IPaymentVerificationResponse> {
     try {
       const response = await this.client.get(`/transactions/${transactionId}/verify`);
       
@@ -80,7 +97,7 @@ class FlutterwaveProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Flutterwave payment verification failed:', error);
       if (error.response) {
         throw new AppError(`Flutterwave error: ${error.response.data.message}`, 400);
@@ -89,7 +106,7 @@ class FlutterwaveProvider {
     }
   }
 
-  async initiatePayout(data) {
+  async initiatePayout(data: IPayoutData): Promise<IPayoutResponse> {
     try {
       const { amount, currency, reference, bankDetails } = data;
       
@@ -117,7 +134,7 @@ class FlutterwaveProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Flutterwave payout failed:', error);
       if (error.response) {
         throw new AppError(`Flutterwave error: ${error.response.data.message}`, 400);
@@ -126,7 +143,7 @@ class FlutterwaveProvider {
     }
   }
 
-  async createVirtualAccount(data) {
+  async createVirtualAccount(data: IVirtualAccountData): Promise<IVirtualAccountResponse> {
     try {
       const { email, firstName, lastName, phoneNumber } = data;
       
@@ -157,7 +174,7 @@ class FlutterwaveProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Flutterwave virtual account creation failed:', error);
       if (error.response) {
         throw new AppError(`Flutterwave error: ${error.response.data.message}`, 400);
@@ -166,9 +183,9 @@ class FlutterwaveProvider {
     }
   }
 
-  async verifyWebhook(payload, signature) {
+  async verifyWebhook(payload: any, signature: string): Promise<boolean> {
     try {
-      const secretHash = this.config.webhookSecret;
+      const secretHash = this.config.webhookSecret!;
       const hash = crypto
         .createHmac('sha256', secretHash)
         .update(JSON.stringify(payload))
@@ -181,10 +198,10 @@ class FlutterwaveProvider {
     }
   }
 
-  parseWebhookEvent(payload) {
+  parseWebhookEvent(payload: any): IWebhookEvent {
     const { event, data } = payload;
     
-    let status;
+    let status: 'success' | 'failed' | 'pending';
     switch (data.status) {
       case 'successful':
         status = 'success';
@@ -207,7 +224,7 @@ class FlutterwaveProvider {
     };
   }
 
-  async getBanks() {
+  async getBanks(): Promise<IBank[]> {
     try {
       const response = await this.client.get('/banks/NG'); // Nigeria banks
       
@@ -215,10 +232,10 @@ class FlutterwaveProvider {
         throw new AppError('Failed to fetch banks', 400);
       }
 
-      return response.data.data.map(bank => ({
+      return response.data.data.map((bank: any) => ({
         name: bank.name,
         code: bank.code,
-        provider: 'flutterwave'
+        provider: 'flutterwave' as const
       }));
       
     } catch (error) {
@@ -227,7 +244,7 @@ class FlutterwaveProvider {
     }
   }
 
-  async resolveAccountNumber(accountNumber, bankCode) {
+  async resolveAccountNumber(accountNumber: string, bankCode: string): Promise<IAccountResolution> {
     try {
       const payload = {
         account_number: accountNumber,
@@ -246,7 +263,7 @@ class FlutterwaveProvider {
         bankCode: bankCode
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Account resolution failed:', error);
       if (error.response) {
         throw new AppError(`Flutterwave error: ${error.response.data.message}`, 400);
@@ -256,4 +273,4 @@ class FlutterwaveProvider {
   }
 }
 
-module.exports = FlutterwaveProvider;
+export default FlutterwaveProvider;

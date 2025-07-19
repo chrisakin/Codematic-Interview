@@ -1,31 +1,41 @@
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
+import { Request, Response, NextFunction } from 'express';
+import { Error as MongooseError } from 'mongoose';
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
 
-const handleCastErrorDB = (err) => {
+interface MongoError extends Error {
+  code?: number;
+  keyValue?: Record<string, any>;
+  path?: string;
+  value?: any;
+  errors?: Record<string, any>;
+}
+
+const handleCastErrorDB = (err: MongooseError.CastError): AppError => {
   const message = `Invalid ${err.path}: ${err.value}`;
   return new AppError(message, 400);
 };
 
-const handleDuplicateFieldsDB = (err) => {
-  const field = Object.keys(err.keyValue)[0];
-  const value = err.keyValue[field];
+const handleDuplicateFieldsDB = (err: MongoError): AppError => {
+  const field = Object.keys(err.keyValue || {})[0];
+  const value = err.keyValue?.[field];
   const message = `Duplicate field value: ${field} = '${value}'. Please use another value!`;
   return new AppError(message, 400);
 };
 
-const handleValidationErrorDB = (err) => {
-  const errors = Object.values(err.errors).map(el => el.message);
+const handleValidationErrorDB = (err: MongooseError.ValidationError): AppError => {
+  const errors = Object.values(err.errors).map(el => (el as any).message);
   const message = `Invalid input data. ${errors.join('. ')}`;
   return new AppError(message, 400);
 };
 
-const handleJWTError = () =>
+const handleJWTError = (): AppError =>
   new AppError('Invalid token. Please log in again!', 401);
 
-const handleJWTExpiredError = () =>
+const handleJWTExpiredError = (): AppError =>
   new AppError('Your token has expired! Please log in again.', 401);
 
-const sendErrorDev = (err, req, res) => {
+const sendErrorDev = (err: AppError, req: Request, res: Response): Response => {
   // Log error for development
   console.error('ERROR 💥', err);
   
@@ -40,7 +50,7 @@ const sendErrorDev = (err, req, res) => {
   });
 };
 
-const sendErrorProd = (err, req, res) => {
+const sendErrorProd = (err: AppError, req: Request, res: Response): Response => {
   // Operational, trusted error: send message to client
   if (err.isOperational) {
     return res.status(err.statusCode).json({
@@ -59,8 +69,8 @@ const sendErrorProd = (err, req, res) => {
       url: req.originalUrl,
       headers: req.headers,
       body: req.body,
-      user: req.user?.id,
-      tenant: req.tenant?.id
+      user: (req as any).user?.id,
+      tenant: (req as any).tenant?.id
     }
   });
   
@@ -71,12 +81,12 @@ const sendErrorProd = (err, req, res) => {
   });
 };
 
-const errorHandler = (err, req, res, next) => {
+export const errorHandler = (err: any, req: Request, res: Response, next: NextFunction): Response | void => {
   err.statusCode = err.statusCode || 500;
   err.status = err.status || 'error';
   
   if (process.env.NODE_ENV === 'development') {
-    sendErrorDev(err, req, res);
+    return sendErrorDev(err, req, res);
   } else {
     let error = { ...err };
     error.message = err.message;
@@ -88,29 +98,24 @@ const errorHandler = (err, req, res, next) => {
     if (error.name === 'JsonWebTokenError') error = handleJWTError();
     if (error.name === 'TokenExpiredError') error = handleJWTExpiredError();
     
-    sendErrorProd(error, req, res);
+    return sendErrorProd(error, req, res);
   }
 };
 
-const notFound = (req, res, next) => {
+export const notFound = (req: Request, res: Response, next: NextFunction): void => {
   const error = new AppError(`Route ${req.originalUrl} not found`, 404);
   next(error);
 };
 
 // Global unhandled rejection handler
-process.on('unhandledRejection', (err, promise) => {
+process.on('unhandledRejection', (err: Error, promise: Promise<any>) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', err);
   // Close server & exit process
   process.exit(1);
 });
 
 // Global uncaught exception handler
-process.on('uncaughtException', (err) => {
+process.on('uncaughtException', (err: Error) => {
   logger.error('Uncaught Exception thrown:', err);
   process.exit(1);
 });
-
-module.exports = {
-  errorHandler,
-  notFound
-};

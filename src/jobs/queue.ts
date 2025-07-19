@@ -1,6 +1,7 @@
-const { Queue, Worker } = require('bullmq');
-const { getRedisClient } = require('../config/redis');
-const logger = require('../config/logger');
+import { Queue, Worker, Job } from 'bullmq';
+import { getRedisClient } from '@/config/redis';
+import logger from '@/config/logger';
+import { IJobData, IJobOptions } from '@/types';
 
 // Job queues
 const transactionQueue = new Queue('transaction-processing', {
@@ -39,9 +40,9 @@ const notificationQueue = new Queue('notifications', {
 });
 
 // Add job to queue
-async function addJob(queueName, jobType, data, options = {}) {
+export async function addJob(queueName: string, jobType: string, data: IJobData, options: IJobOptions = {}): Promise<Job> {
   try {
-    let queue;
+    let queue: Queue;
     
     switch (queueName) {
       case 'transaction':
@@ -72,9 +73,9 @@ async function addJob(queueName, jobType, data, options = {}) {
 }
 
 // Simplified addJob function for backward compatibility
-async function addJobSimple(jobType, data, options = {}) {
+export async function addJobSimple(jobType: string, data: IJobData, options: IJobOptions = {}): Promise<Job> {
   // Map job types to appropriate queues
-  const queueMap = {
+  const queueMap: Record<string, string> = {
     'processTransaction': 'transaction',
     'sendWebhook': 'webhook',
     'sendNotification': 'notification',
@@ -86,19 +87,19 @@ async function addJobSimple(jobType, data, options = {}) {
 }
 
 // Schedule delayed job
-async function scheduleJob(queueName, jobType, data, delay) {
+export async function scheduleJob(queueName: string, jobType: string, data: IJobData, delay: number): Promise<Job> {
   return addJob(queueName, jobType, data, { delay });
 }
 
 // Schedule recurring job
-async function scheduleRecurringJob(queueName, jobType, data, pattern) {
-  return addJob(queueName, jobType, data, { repeat: { pattern } });
+export async function scheduleRecurringJob(queueName: string, jobType: string, data: IJobData, pattern: string): Promise<Job> {
+  return addJob(queueName, jobType, data, { repeat: { pattern } as any });
 }
 
 // Get queue statistics
-async function getQueueStats(queueName) {
+export async function getQueueStats(queueName: string): Promise<any> {
   try {
-    let queue;
+    let queue: Queue;
     
     switch (queueName) {
       case 'transaction':
@@ -137,9 +138,9 @@ async function getQueueStats(queueName) {
 }
 
 // Retry failed jobs
-async function retryFailedJobs(queueName, limit = 10) {
+export async function retryFailedJobs(queueName: string, limit: number = 10): Promise<{ retried: number; total: number }> {
   try {
-    let queue;
+    let queue: Queue;
     
     switch (queueName) {
       case 'transaction':
@@ -177,9 +178,9 @@ async function retryFailedJobs(queueName, limit = 10) {
 }
 
 // Clean completed/failed jobs
-async function cleanQueue(queueName, olderThan = 24 * 60 * 60 * 1000) { // 24 hours default
+export async function cleanQueue(queueName: string, olderThan: number = 24 * 60 * 60 * 1000): Promise<{ completed: number; failed: number }> {
   try {
-    let queue;
+    let queue: Queue;
     
     switch (queueName) {
       case 'transaction':
@@ -213,15 +214,8 @@ async function cleanQueue(queueName, olderThan = 24 * 60 * 60 * 1000) { // 24 ho
   }
 }
 
-module.exports = {
+export {
   transactionQueue,
   webhookQueue,
-  notificationQueue,
-  addJob,
-  addJob: addJobSimple, // Export simplified version as main addJob
-  scheduleJob,
-  scheduleRecurringJob,
-  getQueueStats,
-  retryFailedJobs,
-  cleanQueue
+  notificationQueue
 };

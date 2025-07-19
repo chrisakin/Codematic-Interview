@@ -1,14 +1,16 @@
-const PaystackProvider = require('./PaystackProvider');
-const FlutterwaveProvider = require('./FlutterwaveProvider');
-const StripeProvider = require('./StripeProvider');
-const Tenant = require('../models/Tenant');
-const { AppError } = require('../utils/errors');
+import PaystackProvider from './PaystackProvider';
+import FlutterwaveProvider from './FlutterwaveProvider';
+import StripeProvider from './StripeProvider';
+import Tenant from '@/models/Tenant';
+import { AppError } from '@/utils/errors';
+import { IPaymentProvider, ITenant, PaymentProvider } from '@/types';
+import { Types } from 'mongoose';
 
 class PaymentProviderFactory {
-  static async getProvider(providerName, tenantId) {
+  static async getProvider(providerName: PaymentProvider, tenantId: Types.ObjectId): Promise<IPaymentProvider> {
     try {
       // Get tenant configuration
-      const tenant = await Tenant.findById(tenantId);
+      const tenant = await Tenant.findById(tenantId) as ITenant;
       if (!tenant) {
         throw new AppError('Tenant not found', 404);
       }
@@ -39,9 +41,9 @@ class PaymentProviderFactory {
     }
   }
 
-  static getSupportedProviders() {
+  static getSupportedProviders(): PaymentProvider[] {
     return ['paystack', 'flutterwave', 'stripe'];
   }
 }
 
-module.exports = PaymentProviderFactory;
+export default PaymentProviderFactory;

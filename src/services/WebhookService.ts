@@ -1,27 +1,27 @@
-const axios = require('axios');
-const Tenant = require('../models/Tenant');
-const Transaction = require('../models/Transaction');
-const logger = require('../config/logger');
-const { addJob } = require('../jobs/queue');
-const { AppError } = require('../utils/errors');
+import axios from 'axios';
+import Tenant from '@/models/Tenant';
+import Transaction from '@/models/Transaction';
+import logger from '@/config/logger';
+import { addJobSimple as addJob } from '@/jobs/queue';
+import { AppError } from '@/utils/errors';
+import { ITransaction, ITenant, IUser, IWebhookPayload, ITransactionStats } from '@/types';
+import { Types } from 'mongoose';
 
 class WebhookService {
-  constructor() {
-    this.maxRetries = 5;
-    this.retryDelays = [1000, 5000, 15000, 60000, 300000]; // 1s, 5s, 15s, 1m, 5m
-  }
+  private maxRetries: number = 5;
+  private retryDelays: number[] = [1000, 5000, 15000, 60000, 300000]; // 1s, 5s, 15s, 1m, 5m
 
-  async sendWebhook(transactionId, event) {
+  async sendWebhook(transactionId: string, event: string): Promise<any> {
     try {
       const transaction = await Transaction.findById(transactionId)
         .populate('tenant', 'settings.webhookUrl name')
-        .populate('user', 'firstName lastName email');
+        .populate('user', 'firstName lastName email') as ITransaction;
 
       if (!transaction) {
         throw new AppError('Transaction not found', 404);
       }
 
-      const tenant = transaction.tenant;
+      const tenant = transaction.tenant as ITenant;
       if (!tenant.settings.webhookUrl) {
         logger.warn(`No webhook URL configured for tenant: ${tenant._id}`);
         return;
@@ -49,12 +49,12 @@ class WebhookService {
       logger.error('Webhook send failed:', error);
       
       // Update transaction and schedule retry if needed
-      await this.handleWebhookFailure(transactionId, error);
+      await this.handleWebhookFailure(transactionId, error as Error);
       throw error;
     }
   }
 
-  async sendWebhookRequest(url, payload, signature, timeout = 10000) {
+  async sendWebhookRequest(url: string, payload: IWebhookPayload, signature: string, timeout: number = 10000): Promise<any> {
     const headers = {
       'Content-Type': 'application/json',
       'User-Agent': 'VirtualWallet/1.0',
@@ -71,7 +71,9 @@ class WebhookService {
     return response.data;
   }
 
-  buildWebhookPayload(transaction, event) {
+  buildWebhookPayload(transaction: ITransaction, event: string): IWebhookPayload {
+    const user = transaction.user as IUser;
+    
     return {
       event: event,
       data: {
@@ -83,10 +85,10 @@ class WebhookService {
         currency: transaction.currency,
         description: transaction.description,
         user: {
-          id: transaction.user._id,
-          email: transaction.user.email,
-          firstName: transaction.user.firstName,
-          lastName: transaction.user.lastName
+          id: user._id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName
         },
         metadata: transaction.metadata,
         createdAt: transaction.createdAt,
@@ -97,7 +99,7 @@ class WebhookService {
     };
   }
 
-  generateSignature(payload, secretKey) {
+  generateSignature(payload: IWebhookPayload, secretKey: string): string {
     const crypto = require('crypto');
     const payloadString = JSON.stringify(payload);
     return crypto
@@ -106,9 +108,9 @@ class WebhookService {
       .digest('hex');
   }
 
-  async handleWebhookFailure(transactionId, error) {
+  async handleWebhookFailure(transactionId: string, error: Error): Promise<void> {
     try {
-      const transaction = await Transaction.findById(transactionId);
+      const transaction = await Transaction.findById(transactionId) as ITransaction;
       if (!transaction) return;
 
       transaction.incrementWebhookAttempt();
@@ -140,9 +142,9 @@ class WebhookService {
     }
   }
 
-  async retryWebhook(transactionId) {
+  async retryWebhook(transactionId: string): Promise<void> {
     try {
-      const transaction = await Transaction.findById(transactionId);
+      const transaction = await Transaction.findById(transactionId) as ITransaction;
       if (!transaction) {
         throw new AppError('Transaction not found', 404);
       }
@@ -168,13 +170,13 @@ class WebhookService {
     }
   }
 
-  async processIncomingWebhook(provider, payload, signature, tenantId) {
+  async processIncomingWebhook(provider: string, payload: any, signature: string, tenantId: string): Promise<any> {
     try {
-      const TransactionService = require('./TransactionService');
+      const TransactionService = (await import('./TransactionService')).default;
       
       // Handle webhook using TransactionService
       const result = await TransactionService.handleWebhook(
-        provider,
+        provider as any,
         payload,
         signature,
         tenantId
@@ -196,11 +198,11 @@ class WebhookService {
   }
 
   // Get webhook delivery logs for a transaction
-  async getWebhookLogs(transactionId) {
+  async getWebhookLogs(transactionId: string): Promise<any> {
     try {
       const transaction = await Transaction.findById(transactionId)
         .select('reference webhookStatus webhookAttempts webhookLastAttempt')
-        .lean();
+        .lean() as ITransaction;
 
       if (!transaction) {
         throw new AppError('Transaction not found', 404);
@@ -220,9 +222,9 @@ class WebhookService {
   }
 
   // Replay webhook for a specific transaction
-  async replayWebhook(transactionId, event = null) {
+  async replayWebhook(transactionId: string, event?: string): Promise<{ success: boolean; message: string }> {
     try {
-      const transaction = await Transaction.findById(transactionId);
+      const transaction = await Transaction.findById(transactionId) as ITransaction;
       if (!transaction) {
         throw new AppError('Transaction not found', 404);
       }
@@ -249,7 +251,7 @@ class WebhookService {
   }
 
   // Get webhook statistics for a tenant
-  async getWebhookStats(tenantId, startDate, endDate) {
+  async getWebhookStats(tenantId: Types.ObjectId, startDate: string, endDate: string): Promise<ITransactionStats> {
     try {
       const matchStage = {
         tenant: tenantId,
@@ -270,21 +272,22 @@ class WebhookService {
         }
       ]);
 
-      const result = {
+      const result: ITransactionStats = {
         pending: 0,
         sent: 0,
         failed: 0,
-        totalAttempts: 0
+        totalAttempts: 0,
+        successRate: '0'
       };
 
       stats.forEach(stat => {
-        result[stat._id] = stat.count;
+        (result as any)[stat._id] = stat.count;
         result.totalAttempts += stat.totalAttempts;
       });
 
       // Calculate success rate
       const total = result.pending + result.sent + result.failed;
-      result.successRate = total > 0 ? (result.sent / total * 100).toFixed(2) : 0;
+      result.successRate = total > 0 ? (result.sent / total * 100).toFixed(2) : '0';
 
       return result;
 
@@ -295,4 +298,4 @@ class WebhookService {
   }
 }
 
-module.exports = new WebhookService();
+export default new WebhookService();

@@ -1,21 +1,34 @@
-const mongoose = require('mongoose');
-const Transaction = require('../models/Transaction');
-const Wallet = require('../models/Wallet');
-const WalletService = require('./WalletService');
-const PaymentProviderFactory = require('../providers/PaymentProviderFactory');
-const FraudDetectionService = require('./FraudDetectionService');
-const { getRedisClient } = require('../config/redis');
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
-const { addJob } = require('../jobs/queue');
+import mongoose, { ClientSession } from 'mongoose';
+import Transaction from '@/models/Transaction';
+import Wallet from '@/models/Wallet';
+import WalletService from './WalletService';
+import PaymentProviderFactory from '@/providers/PaymentProviderFactory';
+import FraudDetectionService from './FraudDetectionService';
+import { getRedisClient } from '@/config/redis';
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
+import { addJobSimple as addJob } from '@/jobs/queue';
+import { 
+  ITransaction, 
+  IWallet, 
+  ITransactionInitData, 
+  ITransactionFilters, 
+  IPaginationOptions, 
+  IPaginationResult,
+  PaymentProvider,
+  TransactionStatus,
+  Types
+} from '@/types';
 
 class TransactionService {
+  private redis: any;
+
   constructor() {
     this.redis = getRedisClient();
   }
 
   // Initialize transaction with idempotency check
-  async initializeTransaction(data) {
+  async initializeTransaction(data: ITransactionInitData): Promise<ITransaction> {
     const { tenantId, userId, type, amount, currency, description, paymentMethod, metadata, idempotencyKey } = data;
     
     try {
@@ -24,7 +37,7 @@ class TransactionService {
         const existingTxn = await Transaction.findOne({
           idempotencyKey,
           tenant: tenantId
-        });
+        }) as ITransaction;
         
         if (existingTxn) {
           logger.info(`Returning existing transaction for idempotency key: ${idempotencyKey}`);
@@ -66,7 +79,7 @@ class TransactionService {
         fraudFlags: riskAssessment.flags,
         clientIp: metadata?.clientIp,
         userAgent: metadata?.userAgent
-      });
+      }) as ITransaction;
       
       await transaction.save();
       
@@ -85,13 +98,13 @@ class TransactionService {
   }
 
   // Process transaction based on type
-  async processTransaction(transactionId) {
+  async processTransaction(transactionId: string): Promise<ITransaction> {
     const session = await mongoose.startSession();
     
     try {
       session.startTransaction();
       
-      const transaction = await Transaction.findById(transactionId).session(session);
+      const transaction = await Transaction.findById(transactionId).session(session) as ITransaction;
       if (!transaction) {
         throw new AppError('Transaction not found', 404);
       }
@@ -104,7 +117,7 @@ class TransactionService {
       transaction.markAsProcessing();
       await transaction.save({ session });
       
-      let result;
+      let result: any;
       
       switch (transaction.type) {
         case 'deposit':
@@ -139,13 +152,13 @@ class TransactionService {
         await Transaction.findByIdAndUpdate(transactionId, {
           status: 'failed',
           failedAt: new Date(),
-          'metadata.failureReason': error.message
+          'metadata.failureReason': (error as Error).message
         });
       } catch (updateError) {
         logger.error('Failed to update transaction status:', updateError);
       }
       
-      logger.error(`Transaction processing failed: ${error.message}`);
+      logger.error(`Transaction processing failed: ${(error as Error).message}`);
       throw error;
     } finally {
       session.endSession();
@@ -153,14 +166,14 @@ class TransactionService {
   }
 
   // Process deposit transaction
-  async processDeposit(transaction, session) {
+  async processDeposit(transaction: ITransaction, session: ClientSession): Promise<any> {
     try {
       // Get user's wallet
       const wallet = await Wallet.findOne({
         user: transaction.user,
         tenant: transaction.tenant,
         currency: transaction.currency
-      }).session(session);
+      }).session(session) as IWallet;
       
       if (!wallet) {
         throw new AppError('User wallet not found', 404);
@@ -168,16 +181,16 @@ class TransactionService {
       
       // For external payments, use payment provider
       if (transaction.paymentMethod !== 'wallet') {
-        const provider = PaymentProviderFactory.getProvider(
+        const provider = await PaymentProviderFactory.getProvider(
           transaction.provider || 'paystack',
-          transaction.tenant
+          transaction.tenant as Types.ObjectId
         );
         
         const paymentResult = await provider.initializePayment({
           amount: transaction.amount,
           currency: transaction.currency,
           reference: transaction.reference,
-          email: wallet.user.email,
+          email: (wallet.user as any).email,
           metadata: transaction.metadata
         });
         
@@ -212,13 +225,13 @@ class TransactionService {
   }
 
   // Process withdrawal transaction
-  async processWithdrawal(transaction, session) {
+  async processWithdrawal(transaction: ITransaction, session: ClientSession): Promise<any> {
     try {
       const wallet = await Wallet.findOne({
         user: transaction.user,
         tenant: transaction.tenant,
         currency: transaction.currency
-      }).session(session);
+      }).session(session) as IWallet;
       
       if (!wallet) {
         throw new AppError('User wallet not found', 404);
@@ -242,16 +255,16 @@ class TransactionService {
       
       // For external withdrawals, initiate payout via provider
       if (transaction.paymentMethod !== 'wallet') {
-        const provider = PaymentProviderFactory.getProvider(
+        const provider = await PaymentProviderFactory.getProvider(
           transaction.provider || 'paystack',
-          transaction.tenant
+          transaction.tenant as Types.ObjectId
         );
         
         const payoutResult = await provider.initiatePayout({
           amount: transaction.amount,
           currency: transaction.currency,
           reference: transaction.reference,
-          bankDetails: transaction.metadata.bankDetails
+          bankDetails: transaction.metadata?.bankDetails
         });
         
         transaction.providerReference = payoutResult.reference;
@@ -270,9 +283,9 @@ class TransactionService {
   }
 
   // Process transfer transaction
-  async processTransfer(transaction, session) {
+  async processTransfer(transaction: ITransaction, session: ClientSession): Promise<any> {
     try {
-      const { sourceWalletId, destinationWalletId } = transaction.metadata;
+      const { sourceWalletId, destinationWalletId } = transaction.metadata || {};
       
       if (!sourceWalletId || !destinationWalletId) {
         throw new AppError('Source and destination wallets required for transfer', 400);
@@ -280,8 +293,8 @@ class TransactionService {
       
       // Verify wallets exist and belong to tenant
       const [sourceWallet, destinationWallet] = await Promise.all([
-        Wallet.findOne({ _id: sourceWalletId, tenant: transaction.tenant }).session(session),
-        Wallet.findOne({ _id: destinationWalletId, tenant: transaction.tenant }).session(session)
+        Wallet.findOne({ _id: sourceWalletId, tenant: transaction.tenant }).session(session) as Promise<IWallet>,
+        Wallet.findOne({ _id: destinationWalletId, tenant: transaction.tenant }).session(session) as Promise<IWallet>
       ]);
       
       if (!sourceWallet || !destinationWallet) {
@@ -310,9 +323,9 @@ class TransactionService {
   }
 
   // Handle webhook events from payment providers
-  async handleWebhook(provider, event, signature, tenantId) {
+  async handleWebhook(provider: PaymentProvider, event: any, signature: string, tenantId: string): Promise<any> {
     try {
-      const providerInstance = PaymentProviderFactory.getProvider(provider, tenantId);
+      const providerInstance = await PaymentProviderFactory.getProvider(provider, new Types.ObjectId(tenantId));
       
       // Verify webhook signature
       const isValid = await providerInstance.verifyWebhook(event, signature);
@@ -329,7 +342,7 @@ class TransactionService {
           { providerReference: reference }
         ],
         tenant: tenantId
-      });
+      }) as ITransaction;
       
       if (!transaction) {
         logger.warn(`Transaction not found for webhook: ${reference}`);
@@ -348,13 +361,13 @@ class TransactionService {
     }
   }
 
-  async updateTransactionFromWebhook(transaction, status, webhookData) {
+  async updateTransactionFromWebhook(transaction: ITransaction, status: string, webhookData: any): Promise<void> {
     const session = await mongoose.startSession();
     
     try {
       session.startTransaction();
       
-      const updatedTransaction = await Transaction.findById(transaction._id).session(session);
+      const updatedTransaction = await Transaction.findById(transaction._id).session(session) as ITransaction;
       
       switch (status) {
         case 'success':
@@ -364,7 +377,7 @@ class TransactionService {
               user: updatedTransaction.user,
               tenant: updatedTransaction.tenant,
               currency: updatedTransaction.currency
-            }).session(session);
+            }).session(session) as IWallet;
             
             if (wallet) {
               await WalletService.creditWallet(
@@ -409,7 +422,7 @@ class TransactionService {
   }
 
   // Get transaction by reference
-  async getTransactionByReference(reference, tenantId) {
+  async getTransactionByReference(reference: string, tenantId: Types.ObjectId): Promise<ITransaction | null> {
     const cacheKey = `transaction:${tenantId}:${reference}`;
     
     try {
@@ -423,7 +436,7 @@ class TransactionService {
     
     const transaction = await Transaction.findOne({ reference, tenant: tenantId })
       .populate('user', 'firstName lastName email')
-      .populate('sourceWallet destinationWallet');
+      .populate('sourceWallet destinationWallet') as ITransaction;
     
     if (transaction) {
       // Cache for 5 minutes
@@ -434,11 +447,11 @@ class TransactionService {
   }
 
   // Get paginated transaction history
-  async getTransactionHistory(filters, pagination) {
+  async getTransactionHistory(filters: ITransactionFilters, pagination: IPaginationOptions): Promise<IPaginationResult<ITransaction>> {
     const { tenantId, userId, status, type, startDate, endDate } = filters;
     const { page = 1, limit = 20, sort = '-createdAt' } = pagination;
     
-    const query = { tenant: tenantId };
+    const query: any = { tenant: tenantId };
     
     if (userId) query.user = userId;
     if (status) query.status = status;
@@ -457,12 +470,12 @@ class TransactionService {
         .sort(sort)
         .skip(skip)
         .limit(limit)
-        .lean(),
+        .lean() as Promise<ITransaction[]>,
       Transaction.countDocuments(query)
     ]);
     
     return {
-      transactions,
+      data: transactions,
       pagination: {
         current: page,
         pages: Math.ceil(total / limit),
@@ -474,8 +487,8 @@ class TransactionService {
   }
 
   // Retry failed transactions
-  async retryFailedTransaction(transactionId) {
-    const transaction = await Transaction.findById(transactionId);
+  async retryFailedTransaction(transactionId: string): Promise<ITransaction> {
+    const transaction = await Transaction.findById(transactionId) as ITransaction;
     
     if (!transaction) {
       throw new AppError('Transaction not found', 404);
@@ -498,6 +511,18 @@ class TransactionService {
     logger.info(`Transaction retry queued: ${transaction.reference}`);
     return transaction;
   }
+
+  // Validate transaction (placeholder for additional validation logic)
+  async validateTransaction(transactionId: string): Promise<void> {
+    const transaction = await Transaction.findById(transactionId) as ITransaction;
+    
+    if (!transaction) {
+      throw new AppError('Transaction not found', 404);
+    }
+    
+    // Add validation logic here
+    logger.info(`Transaction validated: ${transaction.reference}`);
+  }
 }
 
-module.exports = new TransactionService();
+export default new TransactionService();

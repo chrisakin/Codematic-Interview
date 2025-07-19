@@ -1,11 +1,21 @@
-const jwt = require('jsonwebtoken');
-const User = require('../models/User');
-const Tenant = require('../models/Tenant');
-const { AppError } = require('../utils/errors');
-const logger = require('../config/logger');
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+import User from '@/models/User';
+import Tenant from '@/models/Tenant';
+import Transaction from '@/models/Transaction';
+import { AppError } from '@/utils/errors';
+import logger from '@/config/logger';
+import { IAuthenticatedRequest, IUser, ITenant, ITransaction } from '@/types';
+
+interface JWTPayload {
+  userId: string;
+  tenantId: string;
+  iat: number;
+  exp: number;
+}
 
 // Verify JWT token and attach user to request
-const authenticate = async (req, res, next) => {
+export const authenticate = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -20,10 +30,10 @@ const authenticate = async (req, res, next) => {
     }
     
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JWTPayload;
     
     // Check if user still exists
-    const user = await User.findById(decoded.userId).populate('tenant');
+    const user = await User.findById(decoded.userId).populate('tenant') as IUser;
     
     if (!user) {
       return next(new AppError('User no longer exists', 401));
@@ -41,10 +51,10 @@ const authenticate = async (req, res, next) => {
     
     // Attach user and tenant to request
     req.user = user;
-    req.tenant = user.tenant;
+    req.tenant = user.tenant as ITenant;
     
     next();
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
       return next(new AppError('Invalid access token', 401));
     }
@@ -58,15 +68,15 @@ const authenticate = async (req, res, next) => {
 };
 
 // Verify API key for webhook endpoints
-const authenticateApiKey = async (req, res, next) => {
+export const authenticateApiKey = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const apiKey = req.headers['x-api-key'] || req.query.api_key;
+    const apiKey = req.headers['x-api-key'] as string || req.query.api_key as string;
     
     if (!apiKey) {
       return next(new AppError('API key required', 401));
     }
     
-    const tenant = await Tenant.findOne({ apiKey });
+    const tenant = await Tenant.findOne({ apiKey }) as ITenant;
     
     if (!tenant) {
       return next(new AppError('Invalid API key', 401));
@@ -85,10 +95,10 @@ const authenticateApiKey = async (req, res, next) => {
 };
 
 // Verify webhook signature
-const authenticateWebhook = (req, res, next) => {
+export const authenticateWebhook = (req: IAuthenticatedRequest, res: Response, next: NextFunction): void => {
   try {
-    const signature = req.headers['x-webhook-signature'] || req.headers['x-paystack-signature'];
-    const timestamp = req.headers['x-webhook-timestamp'];
+    const signature = req.headers['x-webhook-signature'] as string || req.headers['x-paystack-signature'] as string;
+    const timestamp = req.headers['x-webhook-timestamp'] as string;
     
     if (!signature) {
       return next(new AppError('Webhook signature required', 401));
@@ -106,13 +116,13 @@ const authenticateWebhook = (req, res, next) => {
 };
 
 // Authorization middleware
-const authorize = (...roles) => {
-  return (req, res, next) => {
+export const authorize = (...roles: string[]) => {
+  return (req: IAuthenticatedRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
       return next(new AppError('Authentication required', 401));
     }
     
-    const userRole = req.user.role || 'user';
+    const userRole = (req.user as any).role || 'user';
     
     if (!roles.includes(userRole)) {
       return next(new AppError('Insufficient permissions', 403));
@@ -123,7 +133,7 @@ const authorize = (...roles) => {
 };
 
 // Check if user is verified (KYC)
-const requireVerification = (req, res, next) => {
+export const requireVerification = (req: IAuthenticatedRequest, res: Response, next: NextFunction): void => {
   if (!req.user) {
     return next(new AppError('Authentication required', 401));
   }
@@ -136,7 +146,7 @@ const requireVerification = (req, res, next) => {
 };
 
 // Optional authentication - doesn't fail if no token
-const optionalAuth = async (req, res, next) => {
+export const optionalAuth = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -150,12 +160,12 @@ const optionalAuth = async (req, res, next) => {
       return next();
     }
     
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-    const user = await User.findById(decoded.userId).populate('tenant');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JWTPayload;
+    const user = await User.findById(decoded.userId).populate('tenant') as IUser;
     
     if (user && user.status === 'active' && user.tenant.isActive()) {
       req.user = user;
-      req.tenant = user.tenant;
+      req.tenant = user.tenant as ITenant;
     }
     
     next();
@@ -165,31 +175,8 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
-// Rate limiting per tenant
-const tenantRateLimit = (req, res, next) => {
-  if (!req.tenant) {
-    return next();
-  }
-  
-  const rateLimit = require('express-rate-limit');
-  
-  const limiter = rateLimit({
-    windowMs: req.tenant.settings.rateLimit.windowMs || 900000, // 15 minutes
-    max: req.tenant.settings.rateLimit.requests || 1000,
-    keyGenerator: (req) => `tenant:${req.tenant._id}:${req.ip}`,
-    message: {
-      error: 'Too many requests from this tenant',
-      code: 'RATE_LIMIT_EXCEEDED'
-    },
-    standardHeaders: true,
-    legacyHeaders: false
-  });
-  
-  limiter(req, res, next);
-};
-
 // Check transaction permissions
-const checkTransactionPermissions = async (req, res, next) => {
+export const checkTransactionPermissions = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { transactionId } = req.params;
     
@@ -197,16 +184,15 @@ const checkTransactionPermissions = async (req, res, next) => {
       return next();
     }
     
-    const Transaction = require('../models/Transaction');
-    const transaction = await Transaction.findById(transactionId);
+    const transaction = await Transaction.findById(transactionId) as ITransaction;
     
     if (!transaction) {
       return next(new AppError('Transaction not found', 404));
     }
     
     // Check if user owns the transaction or is admin
-    if (transaction.user.toString() !== req.user._id.toString() && 
-        req.user.role !== 'admin') {
+    if (transaction.user?.toString() !== req.user._id.toString() && 
+        (req.user as any).role !== 'admin') {
       return next(new AppError('Access denied', 403));
     }
     
@@ -221,15 +207,4 @@ const checkTransactionPermissions = async (req, res, next) => {
     logger.error('Transaction permission check failed:', error);
     next(error);
   }
-};
-
-module.exports = {
-  authenticate,
-  authenticateApiKey,
-  authenticateWebhook,
-  authorize,
-  requireVerification,
-  optionalAuth,
-  tenantRateLimit,
-  checkTransactionPermissions
 };

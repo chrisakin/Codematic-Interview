@@ -1,10 +1,12 @@
-const express = require('express');
-const { body, query, param, validationResult } = require('express-validator');
+import express, { Request, Response } from 'express';
+import { body, query, param, validationResult } from 'express-validator';
 
-const TransactionService = require('../services/TransactionService');
-const { authenticate, requireVerification, checkTransactionPermissions } = require('../middleware/auth');
-const { AppError, catchAsync } = require('../utils/errors');
-const logger = require('../config/logger');
+import TransactionService from '@/services/TransactionService';
+import { authenticate, requireVerification, checkTransactionPermissions } from '@/middleware/auth';
+import { AppError, catchAsync } from '@/utils/errors';
+import logger from '@/config/logger';
+import { IAuthenticatedRequest, TransactionType, TransactionStatus, Currency, PaymentMethod } from '@/types';
+import Transaction from '@/models/Transaction';
 
 const router = express.Router();
 
@@ -64,7 +66,7 @@ router.post('/', [
   body('paymentMethod').optional().isIn(['card', 'bank_transfer', 'mobile_money', 'virtual_account', 'wallet']),
   body('provider').optional().isIn(['paystack', 'flutterwave', 'stripe']),
   body('idempotencyKey').optional().isString()
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -78,11 +80,11 @@ router.post('/', [
   const transactionData = {
     tenantId: req.tenant._id,
     userId: req.user._id,
-    type,
+    type: type as TransactionType,
     amount: amountInMinor,
-    currency,
+    currency: currency as Currency,
     description,
-    paymentMethod: paymentMethod || 'card',
+    paymentMethod: (paymentMethod || 'card') as PaymentMethod,
     metadata: {
       ...metadata,
       clientIp: req.ip,
@@ -150,7 +152,7 @@ router.get('/', [
   query('type').optional().isIn(['deposit', 'withdrawal', 'transfer', 'fee', 'refund']),
   query('startDate').optional().isISO8601(),
   query('endDate').optional().isISO8601()
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -161,13 +163,16 @@ router.get('/', [
   const filters = {
     tenantId: req.tenant._id,
     userId: req.user._id,
-    status,
-    type,
-    startDate,
-    endDate
+    status: status as TransactionStatus,
+    type: type as TransactionType,
+    startDate: startDate as string,
+    endDate: endDate as string
   };
 
-  const pagination = { page, limit };
+  const pagination = { 
+    page: page ? Number(page) : undefined, 
+    limit: limit ? Number(limit) : undefined 
+  };
 
   const result = await TransactionService.getTransactionHistory(filters, pagination);
 
@@ -197,7 +202,7 @@ router.get('/', [
  */
 router.get('/:reference', [
   param('reference').isString().withMessage('Transaction reference is required')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -212,7 +217,7 @@ router.get('/:reference', [
   }
 
   // Check if user owns the transaction
-  if (transaction.user._id.toString() !== req.user._id.toString()) {
+  if (transaction.user?._id.toString() !== req.user._id.toString()) {
     throw new AppError('Access denied', 403);
   }
 
@@ -243,7 +248,7 @@ router.get('/:reference', [
 router.post('/:transactionId/retry', [
   requireVerification,
   checkTransactionPermissions
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const { transactionId } = req.params;
 
   const transaction = await TransactionService.retryFailedTransaction(transactionId);
@@ -276,11 +281,11 @@ router.post('/:transactionId/retry', [
 router.post('/process/:transactionId', [
   requireVerification,
   param('transactionId').isMongoId().withMessage('Valid transaction ID required')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const { transactionId } = req.params;
 
   // Check if user has admin role (you might want to add this to auth middleware)
-  if (req.user.role !== 'admin') {
+  if ((req.user as any).role !== 'admin') {
     throw new AppError('Admin access required', 403);
   }
 
@@ -314,14 +319,12 @@ router.post('/process/:transactionId', [
  */
 router.get('/stats', [
   query('period').optional().isIn(['today', 'week', 'month', 'year'])
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const { period = 'month' } = req.query;
-
-  const Transaction = require('../models/Transaction');
 
   // Calculate date range based on period
   const now = new Date();
-  let startDate;
+  let startDate: Date;
 
   switch (period) {
     case 'today':
@@ -384,4 +387,4 @@ router.get('/stats', [
   });
 }));
 
-module.exports = router;
+export default router;

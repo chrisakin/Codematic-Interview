@@ -1,25 +1,29 @@
-const User = require('../models/User');
-const Transaction = require('../models/Transaction');
-const Wallet = require('../models/Wallet');
-const { getRedisClient } = require('../config/redis');
-const logger = require('../config/logger');
+import User from '@/models/User';
+import Transaction from '@/models/Transaction';
+import Wallet from '@/models/Wallet';
+import { getRedisClient } from '@/config/redis';
+import logger from '@/config/logger';
+import { IFraudCheckData, IRiskAssessment, IUser } from '@/types';
+import { Types } from 'mongoose';
 
 class FraudDetectionService {
+  private redis: any;
+  private riskThresholds = {
+    LOW: 30,
+    MEDIUM: 60,
+    HIGH: 80
+  };
+
   constructor() {
     this.redis = getRedisClient();
-    this.riskThresholds = {
-      LOW: 30,
-      MEDIUM: 60,
-      HIGH: 80
-    };
   }
 
-  async assessTransaction(data) {
+  async assessTransaction(data: IFraudCheckData): Promise<IRiskAssessment> {
     const { tenantId, userId, amount, currency, type, paymentMethod, metadata } = data;
     
     try {
       let riskScore = 0;
-      const flags = [];
+      const flags: string[] = [];
       
       // Run parallel risk checks
       const [
@@ -57,7 +61,7 @@ class FraudDetectionService {
                          flags.includes('STOLEN_CARD') || 
                          flags.includes('BLACKLISTED_IP');
       
-      const reason = shouldBlock ? this.getBlockReason(flags) : null;
+      const reason = shouldBlock ? this.getBlockReason(flags) : undefined;
       
       // Cache risk assessment for future reference
       await this.cacheRiskAssessment(userId, tenantId, {
@@ -83,13 +87,13 @@ class FraudDetectionService {
         score: 50,
         flags: ['FRAUD_CHECK_FAILED'],
         shouldBlock: false,
-        reason: null,
+        reason: undefined,
         riskLevel: 'MEDIUM'
       };
     }
   }
 
-  async checkTransactionVelocity(userId, tenantId) {
+  async checkTransactionVelocity(userId: Types.ObjectId, tenantId: Types.ObjectId): Promise<{ score: number; flags: string[] }> {
     try {
       const cacheKey = `velocity:${userId}:${tenantId}`;
       let velocityData = await this.redis.get(cacheKey);
@@ -112,7 +116,7 @@ class FraudDetectionService {
         await this.redis.setEx(cacheKey, 3600, JSON.stringify(velocityData));
       }
       
-      const flags = [];
+      const flags: string[] = [];
       let score = 0;
       
       if (velocityData.count > 20) {
@@ -131,9 +135,9 @@ class FraudDetectionService {
     }
   }
 
-  async checkTransactionAmount(amount, currency, userId, tenantId) {
+  async checkTransactionAmount(amount: number, currency: string, userId: Types.ObjectId, tenantId: Types.ObjectId): Promise<{ score: number; flags: string[] }> {
     try {
-      const flags = [];
+      const flags: string[] = [];
       let score = 0;
       
       // Get user's transaction history to establish patterns
@@ -188,12 +192,12 @@ class FraudDetectionService {
     }
   }
 
-  async checkUserPattern(userId, tenantId) {
+  async checkUserPattern(userId: Types.ObjectId, tenantId: Types.ObjectId): Promise<{ score: number; flags: string[] }> {
     try {
-      const flags = [];
+      const flags: string[] = [];
       let score = 0;
       
-      const user = await User.findById(userId);
+      const user = await User.findById(userId) as IUser;
       if (!user) {
         flags.push('USER_NOT_FOUND');
         return { score: 50, flags };
@@ -237,9 +241,9 @@ class FraudDetectionService {
     }
   }
 
-  async checkDeviceFingerprint(clientIp, userAgent, userId) {
+  async checkDeviceFingerprint(clientIp?: string, userAgent?: string, userId?: Types.ObjectId): Promise<{ score: number; flags: string[] }> {
     try {
-      const flags = [];
+      const flags: string[] = [];
       let score = 0;
       
       if (!clientIp || !userAgent) {
@@ -261,22 +265,24 @@ class FraudDetectionService {
       }
       
       // Check device consistency for user
-      const deviceKey = `device:${userId}`;
-      const knownDevices = await this.redis.sMembers(deviceKey);
-      
-      const deviceFingerprint = this.generateDeviceFingerprint(clientIp, userAgent);
-      
-      if (knownDevices.length > 0 && !knownDevices.includes(deviceFingerprint)) {
-        flags.push('NEW_DEVICE');
-        score += 15;
+      if (userId) {
+        const deviceKey = `device:${userId}`;
+        const knownDevices = await this.redis.sMembers(deviceKey);
         
-        // Add to known devices
-        await this.redis.sAdd(deviceKey, deviceFingerprint);
-        await this.redis.expire(deviceKey, 86400 * 30); // 30 days
-      } else if (knownDevices.length === 0) {
-        // First time user
-        await this.redis.sAdd(deviceKey, deviceFingerprint);
-        await this.redis.expire(deviceKey, 86400 * 30);
+        const deviceFingerprint = this.generateDeviceFingerprint(clientIp, userAgent);
+        
+        if (knownDevices.length > 0 && !knownDevices.includes(deviceFingerprint)) {
+          flags.push('NEW_DEVICE');
+          score += 15;
+          
+          // Add to known devices
+          await this.redis.sAdd(deviceKey, deviceFingerprint);
+          await this.redis.expire(deviceKey, 86400 * 30); // 30 days
+        } else if (knownDevices.length === 0) {
+          // First time user
+          await this.redis.sAdd(deviceKey, deviceFingerprint);
+          await this.redis.expire(deviceKey, 86400 * 30);
+        }
       }
       
       return { score, flags };
@@ -287,9 +293,9 @@ class FraudDetectionService {
     }
   }
 
-  async checkCardRisk(metadata) {
+  async checkCardRisk(metadata?: any): Promise<{ score: number; flags: string[] }> {
     try {
-      const flags = [];
+      const flags: string[] = [];
       let score = 0;
       
       const { cardBin, cardLast4, cardType } = metadata || {};
@@ -332,7 +338,7 @@ class FraudDetectionService {
     }
   }
 
-  async isVpnOrProxy(ip) {
+  async isVpnOrProxy(ip: string): Promise<boolean> {
     // Simple implementation - in production, use a proper IP intelligence service
     try {
       const vpnKeywords = ['vpn', 'proxy', 'tor', 'anonymous'];
@@ -343,12 +349,12 @@ class FraudDetectionService {
     }
   }
 
-  generateDeviceFingerprint(ip, userAgent) {
+  generateDeviceFingerprint(ip: string, userAgent: string): string {
     const crypto = require('crypto');
     return crypto.createHash('sha256').update(`${ip}:${userAgent}`).digest('hex');
   }
 
-  async cacheRiskAssessment(userId, tenantId, assessment) {
+  async cacheRiskAssessment(userId: Types.ObjectId, tenantId: Types.ObjectId, assessment: any): Promise<void> {
     try {
       const key = `risk:${userId}:${tenantId}`;
       await this.redis.setEx(key, 3600, JSON.stringify(assessment)); // 1 hour
@@ -357,13 +363,13 @@ class FraudDetectionService {
     }
   }
 
-  getRiskLevel(score) {
+  getRiskLevel(score: number): 'LOW' | 'MEDIUM' | 'HIGH' {
     if (score >= this.riskThresholds.HIGH) return 'HIGH';
     if (score >= this.riskThresholds.MEDIUM) return 'MEDIUM';
     return 'LOW';
   }
 
-  getBlockReason(flags) {
+  getBlockReason(flags: string[]): string {
     if (flags.includes('STOLEN_CARD')) return 'Suspected stolen card';
     if (flags.includes('BLACKLISTED_IP')) return 'IP address is blacklisted';
     if (flags.includes('HIGH_VELOCITY')) return 'Too many transactions in short time';
@@ -372,20 +378,20 @@ class FraudDetectionService {
   }
 
   // Admin functions for managing fraud rules
-  async addToBlacklist(ip) {
+  async addToBlacklist(ip: string): Promise<void> {
     await this.redis.sAdd('blacklisted_ips', ip);
     logger.info(`IP ${ip} added to blacklist`);
   }
 
-  async removeFromBlacklist(ip) {
+  async removeFromBlacklist(ip: string): Promise<void> {
     await this.redis.sRem('blacklisted_ips', ip);
     logger.info(`IP ${ip} removed from blacklist`);
   }
 
-  async addStolenCard(cardBin) {
+  async addStolenCard(cardBin: string): Promise<void> {
     await this.redis.sAdd('stolen_cards', cardBin);
     logger.info(`Card BIN ${cardBin} added to stolen cards list`);
   }
 }
 
-module.exports = new FraudDetectionService();
+export default new FraudDetectionService();

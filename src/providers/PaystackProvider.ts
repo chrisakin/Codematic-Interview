@@ -1,12 +1,29 @@
-const axios = require('axios');
-const crypto = require('crypto');
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
+import axios, { AxiosInstance } from 'axios';
+import crypto from 'crypto';
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
+import { 
+  IPaymentProvider, 
+  IPaymentInitData, 
+  IPaymentInitResponse, 
+  IPaymentVerificationResponse,
+  IPayoutData,
+  IPayoutResponse,
+  IVirtualAccountData,
+  IVirtualAccountResponse,
+  IWebhookEvent,
+  IBank,
+  IAccountResolution,
+  IProviderConfig
+} from '@/types';
 
-class PaystackProvider {
-  constructor(config) {
+class PaystackProvider implements IPaymentProvider {
+  private config: IProviderConfig;
+  private baseURL: string = 'https://api.paystack.co';
+  private client: AxiosInstance;
+
+  constructor(config: IProviderConfig) {
     this.config = config;
-    this.baseURL = 'https://api.paystack.co';
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -17,7 +34,7 @@ class PaystackProvider {
     });
   }
 
-  async initializePayment(data) {
+  async initializePayment(data: IPaymentInitData): Promise<IPaymentInitResponse> {
     try {
       const { amount, currency, reference, email, metadata } = data;
       
@@ -45,7 +62,7 @@ class PaystackProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Paystack payment initialization failed:', error);
       if (error.response) {
         throw new AppError(`Paystack error: ${error.response.data.message}`, 400);
@@ -54,7 +71,7 @@ class PaystackProvider {
     }
   }
 
-  async verifyPayment(reference) {
+  async verifyPayment(reference: string): Promise<IPaymentVerificationResponse> {
     try {
       const response = await this.client.get(`/transaction/verify/${reference}`);
       
@@ -74,7 +91,7 @@ class PaystackProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Paystack payment verification failed:', error);
       if (error.response) {
         throw new AppError(`Paystack error: ${error.response.data.message}`, 400);
@@ -83,7 +100,7 @@ class PaystackProvider {
     }
   }
 
-  async initiatePayout(data) {
+  async initiatePayout(data: IPayoutData): Promise<IPayoutResponse> {
     try {
       const { amount, currency, reference, bankDetails } = data;
       
@@ -126,7 +143,7 @@ class PaystackProvider {
         providerResponse: transferResponse.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Paystack payout failed:', error);
       if (error.response) {
         throw new AppError(`Paystack error: ${error.response.data.message}`, 400);
@@ -135,7 +152,7 @@ class PaystackProvider {
     }
   }
 
-  async createVirtualAccount(data) {
+  async createVirtualAccount(data: IVirtualAccountData): Promise<IVirtualAccountResponse> {
     try {
       const { customerId, preferredBank } = data;
       
@@ -161,7 +178,7 @@ class PaystackProvider {
         providerResponse: response.data
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Paystack virtual account creation failed:', error);
       if (error.response) {
         throw new AppError(`Paystack error: ${error.response.data.message}`, 400);
@@ -170,10 +187,10 @@ class PaystackProvider {
     }
   }
 
-  async verifyWebhook(payload, signature) {
+  async verifyWebhook(payload: any, signature: string): Promise<boolean> {
     try {
       const hash = crypto
-        .createHmac('sha512', this.config.webhookSecret)
+        .createHmac('sha512', this.config.webhookSecret!)
         .update(JSON.stringify(payload))
         .digest('hex');
 
@@ -184,10 +201,10 @@ class PaystackProvider {
     }
   }
 
-  parseWebhookEvent(payload) {
+  parseWebhookEvent(payload: any): IWebhookEvent {
     const { event, data } = payload;
     
-    let status;
+    let status: 'success' | 'failed' | 'pending';
     switch (data.status) {
       case 'success':
         status = 'success';
@@ -210,7 +227,7 @@ class PaystackProvider {
     };
   }
 
-  async getBanks() {
+  async getBanks(): Promise<IBank[]> {
     try {
       const response = await this.client.get('/bank');
       
@@ -218,11 +235,11 @@ class PaystackProvider {
         throw new AppError('Failed to fetch banks', 400);
       }
 
-      return response.data.data.map(bank => ({
+      return response.data.data.map((bank: any) => ({
         name: bank.name,
         code: bank.code,
         slug: bank.slug,
-        provider: 'paystack'
+        provider: 'paystack' as const
       }));
       
     } catch (error) {
@@ -231,7 +248,7 @@ class PaystackProvider {
     }
   }
 
-  async resolveAccountNumber(accountNumber, bankCode) {
+  async resolveAccountNumber(accountNumber: string, bankCode: string): Promise<IAccountResolution> {
     try {
       const response = await this.client.get(
         `/bank/resolve?account_number=${accountNumber}&bank_code=${bankCode}`
@@ -247,7 +264,7 @@ class PaystackProvider {
         bankCode: bankCode
       };
       
-    } catch (error) {
+    } catch (error: any) {
       logger.error('Account resolution failed:', error);
       if (error.response) {
         throw new AppError(`Paystack error: ${error.response.data.message}`, 400);
@@ -257,4 +274,4 @@ class PaystackProvider {
   }
 }
 
-module.exports = PaystackProvider;
+export default PaystackProvider;

@@ -1,7 +1,15 @@
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
+import { INotificationData, INotificationResult, IUser } from '@/types';
+import User from '@/models/User';
+import { Types } from 'mongoose';
 
 class NotificationService {
+  private emailEnabled: boolean;
+  private smsEnabled: boolean;
+  private pushEnabled: boolean;
+  private slackEnabled: boolean;
+
   constructor() {
     this.emailEnabled = process.env.EMAIL_ENABLED === 'true';
     this.smsEnabled = process.env.SMS_ENABLED === 'true';
@@ -9,11 +17,11 @@ class NotificationService {
     this.slackEnabled = process.env.SLACK_ENABLED === 'true';
   }
 
-  async sendEmail(to, subject, template, data) {
+  async sendEmail(to: string, subject: string, template: string, data: any): Promise<INotificationResult> {
     try {
       if (!this.emailEnabled) {
         logger.info('Email service disabled, skipping email send');
-        return { success: true, message: 'Email service disabled' };
+        return { success: true, message: 'Email service disabled', provider: 'disabled' };
       }
 
       // Mock email service - replace with actual email provider
@@ -43,11 +51,11 @@ class NotificationService {
     }
   }
 
-  async sendSMS(to, message) {
+  async sendSMS(to: string, message: string): Promise<INotificationResult> {
     try {
       if (!this.smsEnabled) {
         logger.info('SMS service disabled, skipping SMS send');
-        return { success: true, message: 'SMS service disabled' };
+        return { success: true, message: 'SMS service disabled', provider: 'disabled' };
       }
 
       // Mock SMS service - replace with actual SMS provider
@@ -74,11 +82,11 @@ class NotificationService {
     }
   }
 
-  async sendPushNotification(userId, title, body, data = {}) {
+  async sendPushNotification(userId: Types.ObjectId, title: string, body: string, data: any = {}): Promise<INotificationResult> {
     try {
       if (!this.pushEnabled) {
         logger.info('Push notification service disabled, skipping push send');
-        return { success: true, message: 'Push notification service disabled' };
+        return { success: true, message: 'Push notification service disabled', provider: 'disabled' };
       }
 
       // Mock push notification service - replace with actual push provider
@@ -106,11 +114,11 @@ class NotificationService {
     }
   }
 
-  async sendSlackAlert(channel, message, level = 'info') {
+  async sendSlackAlert(channel: string, message: string, level: string = 'info'): Promise<INotificationResult> {
     try {
       if (!this.slackEnabled) {
         logger.info('Slack service disabled, skipping Slack alert');
-        return { success: true, message: 'Slack service disabled' };
+        return { success: true, message: 'Slack service disabled', provider: 'disabled' };
       }
 
       // Mock Slack service - replace with actual Slack webhook
@@ -148,9 +156,9 @@ class NotificationService {
     }
   }
 
-  renderEmailTemplate(template, data) {
+  renderEmailTemplate(template: string, data: any): { subject: string; html: string } {
     // Mock template rendering - replace with actual template engine
-    const templates = {
+    const templates: Record<string, { subject: string; html: string }> = {
       'transaction-completed': {
         subject: 'Transaction Completed',
         html: `
@@ -199,8 +207,8 @@ class NotificationService {
     };
   }
 
-  getSlackColor(level) {
-    const colors = {
+  getSlackColor(level: string): string {
+    const colors: Record<string, string> = {
       info: '#36a64f',     // Green
       warning: '#ff9900',   // Orange
       error: '#ff0000',     // Red
@@ -210,12 +218,12 @@ class NotificationService {
   }
 
   // Send transaction notification based on status
-  async sendTransactionNotification(transaction, user) {
+  async sendTransactionNotification(transaction: any, user: IUser): Promise<{ email: boolean; sms: boolean; push: boolean }> {
     try {
       const { type, status, amount, currency, reference } = transaction;
       
       // Determine notification content based on transaction status
-      let template, smsMessage, pushTitle, pushBody;
+      let template: string, smsMessage: string, pushTitle: string, pushBody: string;
       
       switch (status) {
         case 'completed':
@@ -234,7 +242,7 @@ class NotificationService {
           
         default:
           // Don't send notifications for pending/processing transactions
-          return;
+          return { email: false, sms: false, push: false };
       }
 
       const emailData = {
@@ -243,13 +251,13 @@ class NotificationService {
         currency,
         status,
         type,
-        newBalance: user.wallet?.balance || 0
+        newBalance: (user as any).wallet?.balance || 0
       };
 
       // Send notifications in parallel
       const notifications = await Promise.allSettled([
         this.sendEmail(user.email, '', template, emailData),
-        this.sendSMS(user.phoneNumber, smsMessage),
+        this.sendSMS(user.phoneNumber || '', smsMessage),
         this.sendPushNotification(user._id, pushTitle, pushBody, {
           transactionId: transaction._id,
           reference,
@@ -280,7 +288,7 @@ class NotificationService {
   }
 
   // Send security alert
-  async sendSecurityAlert(user, activity, metadata = {}) {
+  async sendSecurityAlert(user: IUser, activity: string, metadata: any = {}): Promise<void> {
     try {
       const alertData = {
         activity,
@@ -308,18 +316,23 @@ class NotificationService {
   }
 
   // Send bulk notifications (for admin use)
-  async sendBulkNotification(userIds, type, subject, message, data = {}) {
+  async sendBulkNotification(
+    userIds: Types.ObjectId[], 
+    type: 'email' | 'sms' | 'push', 
+    subject: string, 
+    message: string, 
+    data: any = {}
+  ): Promise<{ total: number; successful: number; failed: number; errors: any[] }> {
     try {
-      const User = require('../models/User');
       const users = await User.find({ _id: { $in: userIds } })
         .select('email phoneNumber firstName lastName')
-        .lean();
+        .lean() as IUser[];
 
       const results = {
         total: users.length,
         successful: 0,
         failed: 0,
-        errors: []
+        errors: [] as any[]
       };
 
       for (const user of users) {
@@ -329,7 +342,7 @@ class NotificationService {
               await this.sendEmail(user.email, subject, 'custom', { message, ...data });
               break;
             case 'sms':
-              await this.sendSMS(user.phoneNumber, message);
+              await this.sendSMS(user.phoneNumber || '', message);
               break;
             case 'push':
               await this.sendPushNotification(user._id, subject, message, data);
@@ -341,7 +354,7 @@ class NotificationService {
           results.errors.push({
             userId: user._id,
             email: user.email,
-            error: error.message
+            error: (error as Error).message
           });
         }
       }
@@ -356,4 +369,4 @@ class NotificationService {
   }
 }
 
-module.exports = new NotificationService();
+export default new NotificationService();

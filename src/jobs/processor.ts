@@ -1,14 +1,14 @@
-const { Worker } = require('bullmq');
-const { getRedisClient } = require('../config/redis');
-const logger = require('../config/logger');
+import { Worker, Job } from 'bullmq';
+import { getRedisClient } from '@/config/redis';
+import logger from '@/config/logger';
 
 // Import job handlers
-const TransactionService = require('../services/TransactionService');
-const WebhookService = require('../services/WebhookService');
-const NotificationService = require('../services/NotificationService');
+import TransactionService from '@/services/TransactionService';
+import WebhookService from '@/services/WebhookService';
+import NotificationService from '@/services/NotificationService';
 
 // Transaction processing worker
-const transactionWorker = new Worker('transaction-processing', async (job) => {
+const transactionWorker = new Worker('transaction-processing', async (job: Job) => {
   const { name, data } = job;
   
   try {
@@ -34,7 +34,7 @@ const transactionWorker = new Worker('transaction-processing', async (job) => {
     
     logger.info(`Transaction job completed: ${name}`, { jobId: job.id });
     
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Transaction job failed: ${name}`, { 
       jobId: job.id, 
       error: error.message,
@@ -52,7 +52,7 @@ const transactionWorker = new Worker('transaction-processing', async (job) => {
 });
 
 // Webhook processing worker
-const webhookWorker = new Worker('webhook-notifications', async (job) => {
+const webhookWorker = new Worker('webhook-notifications', async (job: Job) => {
   const { name, data } = job;
   
   try {
@@ -82,7 +82,7 @@ const webhookWorker = new Worker('webhook-notifications', async (job) => {
     
     logger.info(`Webhook job completed: ${name}`, { jobId: job.id });
     
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Webhook job failed: ${name}`, { 
       jobId: job.id, 
       error: error.message,
@@ -100,7 +100,7 @@ const webhookWorker = new Worker('webhook-notifications', async (job) => {
 });
 
 // Notification processing worker
-const notificationWorker = new Worker('notifications', async (job) => {
+const notificationWorker = new Worker('notifications', async (job: Job) => {
   const { name, data } = job;
   
   try {
@@ -129,7 +129,7 @@ const notificationWorker = new Worker('notifications', async (job) => {
     
     logger.info(`Notification job completed: ${name}`, { jobId: job.id });
     
-  } catch (error) {
+  } catch (error: any) {
     logger.error(`Notification job failed: ${name}`, { 
       jobId: job.id, 
       error: error.message,
@@ -152,20 +152,22 @@ const notificationWorker = new Worker('notifications', async (job) => {
     logger.info(`Worker ready: ${worker.name}`);
   });
   
-  worker.on('error', (error) => {
+  worker.on('error', (error: Error) => {
     logger.error(`Worker error: ${worker.name}`, error);
   });
   
-  worker.on('failed', (job, error) => {
-    logger.error(`Job failed: ${job.name}`, {
-      jobId: job.id,
-      error: error.message,
-      failedReason: job.failedReason,
-      attemptsMade: job.attemptsMade
-    });
+  worker.on('failed', (job: Job | undefined, error: Error) => {
+    if (job) {
+      logger.error(`Job failed: ${job.name}`, {
+        jobId: job.id,
+        error: error.message,
+        failedReason: job.failedReason,
+        attemptsMade: job.attemptsMade
+      });
+    }
   });
   
-  worker.on('completed', (job) => {
+  worker.on('completed', (job: Job) => {
     logger.info(`Job completed: ${job.name}`, {
       jobId: job.id,
       duration: Date.now() - job.timestamp,
@@ -173,7 +175,7 @@ const notificationWorker = new Worker('notifications', async (job) => {
     });
   });
   
-  worker.on('progress', (job, progress) => {
+  worker.on('progress', (job: Job, progress: number | object) => {
     logger.debug(`Job progress: ${job.name}`, {
       jobId: job.id,
       progress: progress
@@ -196,7 +198,7 @@ process.on('SIGINT', async () => {
 });
 
 // Health check for workers
-const getWorkerHealth = () => {
+export const getWorkerHealth = () => {
   return {
     transactionWorker: {
       isRunning: transactionWorker.isRunning(),
@@ -214,14 +216,13 @@ const getWorkerHealth = () => {
 };
 
 // Schedule recurring cleanup jobs
-const { scheduleRecurringJob } = require('./queue');
+import { scheduleRecurringJob } from './queue';
 
 // Clean up old jobs daily at 2 AM
 scheduleRecurringJob('notification', 'cleanupJobs', {}, '0 2 * * *');
 
-module.exports = {
+export {
   transactionWorker,
   webhookWorker,
-  notificationWorker,
-  getWorkerHealth
+  notificationWorker
 };

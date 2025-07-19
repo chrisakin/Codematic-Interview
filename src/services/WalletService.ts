@@ -1,14 +1,15 @@
-const mongoose = require('mongoose');
-const Wallet = require('../models/Wallet');
-const Transaction = require('../models/Transaction');
-const { getRedisClient } = require('../config/redis');
-const logger = require('../config/logger');
-const { AppError } = require('../utils/errors');
+import mongoose, { ClientSession } from 'mongoose';
+import Wallet from '@/models/Wallet';
+import Transaction from '@/models/Transaction';
+import { getRedisClient } from '@/config/redis';
+import logger from '@/config/logger';
+import { AppError } from '@/utils/errors';
+import { IWallet, ITransaction, Currency, IFormattedBalance } from '@/types';
+import { Types } from 'mongoose';
 
 class WalletService {
-  constructor() {
-    this._redis = null;
-  }
+  private _redis: any = null;
+  private lockValue: string | null = null;
 
   // Lazy initialization of Redis client
   get redis() {
@@ -19,7 +20,7 @@ class WalletService {
   }
 
   // Create wallet with Redis caching
-  async createWallet(userId, tenantId, currency = 'NGN') {
+  async createWallet(userId: Types.ObjectId, tenantId: Types.ObjectId, currency: Currency = 'NGN'): Promise<IWallet> {
     const session = await mongoose.startSession();
     
     try {
@@ -30,7 +31,7 @@ class WalletService {
         user: userId,
         tenant: tenantId,
         currency
-      }).session(session);
+      }).session(session) as IWallet;
       
       if (existingWallet) {
         throw new AppError('Wallet already exists for this currency', 400);
@@ -42,7 +43,7 @@ class WalletService {
         currency,
         balance: 0,
         ledgerBalance: 0
-      });
+      }) as IWallet;
       
       await wallet.save({ session });
       await session.commitTransaction();
@@ -63,7 +64,7 @@ class WalletService {
   }
 
   // Get wallet with Redis caching and distributed locking
-  async getWallet(userId, tenantId, currency, useCache = true) {
+  async getWallet(userId: Types.ObjectId, tenantId: Types.ObjectId, currency: Currency, useCache: boolean = true): Promise<IWallet> {
     const cacheKey = this.getWalletCacheKey(userId, currency);
     
     if (useCache) {
@@ -81,7 +82,7 @@ class WalletService {
       user: userId,
       tenant: tenantId,
       currency
-    }).populate('user', 'firstName lastName email');
+    }).populate('user', 'firstName lastName email') as IWallet;
     
     if (!wallet) {
       throw new AppError('Wallet not found', 404);
@@ -94,7 +95,13 @@ class WalletService {
   }
 
   // Credit wallet with optimistic locking and atomic operations
-  async creditWallet(walletId, amount, description, transactionRef, session = null) {
+  async creditWallet(
+    walletId: Types.ObjectId, 
+    amount: number, 
+    description: string, 
+    transactionRef: string, 
+    session?: ClientSession
+  ): Promise<{ wallet: IWallet; transaction: ITransaction }> {
     const shouldCommit = !session;
     if (!session) {
       session = await mongoose.startSession();
@@ -111,7 +118,7 @@ class WalletService {
       }
       
       // Find wallet with current version
-      const wallet = await Wallet.findById(walletId).session(session);
+      const wallet = await Wallet.findById(walletId).session(session) as IWallet;
       if (!wallet) {
         throw new AppError('Wallet not found', 404);
       }
@@ -152,7 +159,7 @@ class WalletService {
         currency: wallet.currency,
         description: description,
         destinationWallet: walletId
-      });
+      }) as ITransaction;
       
       await transaction.save({ session });
       
@@ -161,7 +168,7 @@ class WalletService {
       }
       
       // Update cache
-      const updatedWallet = await Wallet.findById(walletId);
+      const updatedWallet = await Wallet.findById(walletId) as IWallet;
       await this.cacheWallet(updatedWallet);
       
       // Release lock
@@ -185,7 +192,13 @@ class WalletService {
   }
 
   // Debit wallet with sufficient balance checks
-  async debitWallet(walletId, amount, description, transactionRef, session = null) {
+  async debitWallet(
+    walletId: Types.ObjectId, 
+    amount: number, 
+    description: string, 
+    transactionRef: string, 
+    session?: ClientSession
+  ): Promise<{ wallet: IWallet; transaction: ITransaction }> {
     const shouldCommit = !session;
     if (!session) {
       session = await mongoose.startSession();
@@ -200,7 +213,7 @@ class WalletService {
         throw new AppError('Unable to acquire wallet lock. Try again later.', 423);
       }
       
-      const wallet = await Wallet.findById(walletId).session(session);
+      const wallet = await Wallet.findById(walletId).session(session) as IWallet;
       if (!wallet) {
         throw new AppError('Wallet not found', 404);
       }
@@ -250,7 +263,7 @@ class WalletService {
         currency: wallet.currency,
         description: description,
         sourceWallet: walletId
-      });
+      }) as ITransaction;
       
       await transaction.save({ session });
       
@@ -259,7 +272,7 @@ class WalletService {
       }
       
       // Update cache
-      const updatedWallet = await Wallet.findById(walletId);
+      const updatedWallet = await Wallet.findById(walletId) as IWallet;
       await this.cacheWallet(updatedWallet);
       
       await this.releaseLock(lockKey);
@@ -282,7 +295,12 @@ class WalletService {
   }
 
   // Transfer between wallets (atomic transaction)
-  async transferBetweenWallets(sourceWalletId, destinationWalletId, amount, description) {
+  async transferBetweenWallets(
+    sourceWalletId: Types.ObjectId, 
+    destinationWalletId: Types.ObjectId, 
+    amount: number, 
+    description: string
+  ): Promise<{ reference: string; amount: number; description: string }> {
     const session = await mongoose.startSession();
     
     try {
@@ -311,7 +329,7 @@ class WalletService {
   }
 
   // Get wallet balance from cache or database
-  async getWalletBalance(walletId) {
+  async getWalletBalance(walletId: Types.ObjectId): Promise<IFormattedBalance> {
     try {
       const cacheKey = `wallet_balance:${walletId}`;
       const cached = await this.redis.get(cacheKey);
@@ -320,7 +338,7 @@ class WalletService {
         return JSON.parse(cached);
       }
       
-      const wallet = await Wallet.findById(walletId);
+      const wallet = await Wallet.findById(walletId) as IWallet;
       if (!wallet) {
         throw new AppError('Wallet not found', 404);
       }
@@ -338,16 +356,16 @@ class WalletService {
   }
 
   // Cache management
-  async cacheWallet(wallet, ttl = 300) {
+  async cacheWallet(wallet: IWallet, ttl: number = 300): Promise<void> {
     try {
-      const cacheKey = this.getWalletCacheKey(wallet.user, wallet.currency);
+      const cacheKey = this.getWalletCacheKey(wallet.user as Types.ObjectId, wallet.currency);
       await this.redis.setEx(cacheKey, ttl, JSON.stringify(wallet));
     } catch (error) {
       logger.warn('Failed to cache wallet:', error);
     }
   }
 
-  async invalidateWalletCache(userId, currency) {
+  async invalidateWalletCache(userId: Types.ObjectId, currency: Currency): Promise<void> {
     try {
       const cacheKey = this.getWalletCacheKey(userId, currency);
       await this.redis.del(cacheKey);
@@ -356,12 +374,12 @@ class WalletService {
     }
   }
 
-  getWalletCacheKey(userId, currency) {
+  getWalletCacheKey(userId: Types.ObjectId, currency: Currency): string {
     return `wallet:${userId}:${currency}`;
   }
 
   // Distributed locking with Redis
-  async acquireLock(lockKey, ttlMs = 30000) {
+  async acquireLock(lockKey: string, ttlMs: number = 30000): Promise<boolean> {
     try {
       const lockValue = `${Date.now()}_${Math.random()}`;
       const result = await this.redis.set(lockKey, lockValue, {
@@ -380,7 +398,7 @@ class WalletService {
     }
   }
 
-  async releaseLock(lockKey) {
+  async releaseLock(lockKey: string): Promise<void> {
     try {
       if (this.lockValue) {
         // Use Lua script for atomic lock release
@@ -403,4 +421,4 @@ class WalletService {
   }
 }
 
-module.exports = new WalletService();
+export default new WalletService();

@@ -1,14 +1,15 @@
-const express = require('express');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const rateLimit = require('express-rate-limit');
-const { body, validationResult } = require('express-validator');
+import express, { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
+import { body, validationResult } from 'express-validator';
 
-const User = require('../models/User');
-const Tenant = require('../models/Tenant');
-const { authenticate, authenticateApiKey } = require('../middleware/auth');
-const { AppError, catchAsync } = require('../utils/errors');
-const logger = require('../config/logger');
+import User from '@/models/User';
+import Tenant from '@/models/Tenant';
+import { authenticate, authenticateApiKey } from '@/middleware/auth';
+import { AppError, catchAsync } from '@/utils/errors';
+import logger from '@/config/logger';
+import { IAuthenticatedRequest, IUser, ITenant } from '@/types';
 
 const router = express.Router();
 
@@ -63,7 +64,7 @@ router.post('/register', [
   body('firstName').trim().isLength({ min: 1 }).withMessage('First name is required'),
   body('lastName').trim().isLength({ min: 1 }).withMessage('Last name is required'),
   body('tenantId').isMongoId().withMessage('Valid tenant ID required')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -72,7 +73,7 @@ router.post('/register', [
   const { email, password, firstName, lastName, phoneNumber, tenantId } = req.body;
 
   // Check if tenant exists and is active
-  const tenant = await Tenant.findById(tenantId);
+  const tenant = await Tenant.findById(tenantId) as ITenant;
   if (!tenant) {
     throw new AppError('Tenant not found', 404);
   }
@@ -82,7 +83,7 @@ router.post('/register', [
   }
 
   // Check if user already exists for this tenant
-  const existingUser = await User.findOne({ email, tenant: tenantId });
+  const existingUser = await User.findOne({ email, tenant: tenantId }) as IUser;
   if (existingUser) {
     throw new AppError('User already exists for this tenant', 409);
   }
@@ -96,7 +97,7 @@ router.post('/register', [
     phoneNumber,
     tenant: tenantId,
     status: 'active' // Auto-activate for demo purposes
-  });
+  }) as IUser;
 
   await user.save();
 
@@ -152,7 +153,7 @@ router.post('/login', [
   body('email').isEmail().normalizeEmail(),
   body('password').notEmpty().withMessage('Password is required'),
   body('tenantId').isMongoId().withMessage('Valid tenant ID required')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -161,7 +162,7 @@ router.post('/login', [
   const { email, password, tenantId } = req.body;
 
   // Find user with tenant
-  const user = await User.findOne({ email, tenant: tenantId }).populate('tenant');
+  const user = await User.findOne({ email, tenant: tenantId }).populate('tenant') as IUser;
   
   if (!user) {
     throw new AppError('Invalid credentials', 401);
@@ -215,7 +216,7 @@ router.post('/login', [
  *       200:
  *         description: User profile retrieved successfully
  */
-router.get('/profile', authenticate, catchAsync(async (req, res) => {
+router.get('/profile', authenticate, catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   res.json({
     status: 'success',
     data: {
@@ -256,7 +257,7 @@ router.patch('/change-password', [
   authenticate,
   body('currentPassword').notEmpty().withMessage('Current password is required'),
   body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -303,7 +304,7 @@ router.patch('/change-password', [
  *       200:
  *         description: Token is valid
  */
-router.post('/verify-token', catchAsync(async (req, res) => {
+router.post('/verify-token', catchAsync(async (req: Request, res: Response) => {
   const { token } = req.body;
 
   if (!token) {
@@ -311,10 +312,10 @@ router.post('/verify-token', catchAsync(async (req, res) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
     
     // Check if user still exists
-    const user = await User.findById(decoded.userId).populate('tenant');
+    const user = await User.findById(decoded.userId).populate('tenant') as IUser;
     
     if (!user) {
       throw new AppError('User no longer exists', 401);
@@ -333,7 +334,7 @@ router.post('/verify-token', catchAsync(async (req, res) => {
         expiresAt: new Date(decoded.exp * 1000)
       }
     });
-  } catch (error) {
+  } catch (error: any) {
     if (error.name === 'JsonWebTokenError') {
       throw new AppError('Invalid token', 401);
     }
@@ -350,7 +351,7 @@ router.post('/register-tenant', [
   body('name').trim().isLength({ min: 1 }).withMessage('Tenant name is required'),
   body('email').isEmail().normalizeEmail(),
   body('businessType').isIn(['ecommerce', 'fintech', 'marketplace', 'saas'])
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: Request, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -359,7 +360,7 @@ router.post('/register-tenant', [
   const { name, email, businessType } = req.body;
 
   // Check if tenant already exists
-  const existingTenant = await Tenant.findOne({ email });
+  const existingTenant = await Tenant.findOne({ email }) as ITenant;
   if (existingTenant) {
     throw new AppError('Tenant already exists', 409);
   }
@@ -383,7 +384,7 @@ router.post('/register-tenant', [
         windowMs: 900000 // 15 minutes
       }
     }
-  });
+  }) as ITenant;
 
   await tenant.save();
 
@@ -399,4 +400,4 @@ router.post('/register-tenant', [
   });
 }));
 
-module.exports = router;
+export default router;

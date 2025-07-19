@@ -1,10 +1,13 @@
-const express = require('express');
-const { body, query, validationResult } = require('express-validator');
+import express, { Request, Response } from 'express';
+import { body, query, validationResult } from 'express-validator';
 
-const WalletService = require('../services/WalletService');
-const { authenticate, requireVerification } = require('../middleware/auth');
-const { AppError, catchAsync } = require('../utils/errors');
-const logger = require('../config/logger');
+import WalletService from '@/services/WalletService';
+import { authenticate, requireVerification } from '@/middleware/auth';
+import { AppError, catchAsync } from '@/utils/errors';
+import logger from '@/config/logger';
+import { IAuthenticatedRequest, Currency } from '@/types';
+import Wallet from '@/models/Wallet';
+import Transaction from '@/models/Transaction';
 
 const router = express.Router();
 
@@ -37,7 +40,7 @@ router.use(authenticate);
  */
 router.post('/', [
   body('currency').isIn(['NGN', 'USD', 'GBP', 'EUR']).withMessage('Invalid currency')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -48,7 +51,7 @@ router.post('/', [
   const wallet = await WalletService.createWallet(
     req.user._id,
     req.tenant._id,
-    currency
+    currency as Currency
   );
 
   res.status(201).json({
@@ -79,16 +82,15 @@ router.post('/', [
  */
 router.get('/', [
   query('currency').optional().isIn(['NGN', 'USD', 'GBP', 'EUR'])
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
   }
 
   const { currency } = req.query;
-  const Wallet = require('../models/Wallet');
 
-  const query = {
+  const query: any = {
     user: req.user._id,
     tenant: req.tenant._id
   };
@@ -138,7 +140,7 @@ router.get('/', [
  *       200:
  *         description: Wallet retrieved successfully
  */
-router.get('/:currency', catchAsync(async (req, res) => {
+router.get('/:currency', catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const { currency } = req.params;
 
   if (!['NGN', 'USD', 'GBP', 'EUR'].includes(currency)) {
@@ -148,7 +150,7 @@ router.get('/:currency', catchAsync(async (req, res) => {
   const wallet = await WalletService.getWallet(
     req.user._id,
     req.tenant._id,
-    currency
+    currency as Currency
   );
 
   const balance = await WalletService.getWalletBalance(wallet._id);
@@ -183,7 +185,7 @@ router.get('/:currency', catchAsync(async (req, res) => {
  *       200:
  *         description: Balance retrieved successfully
  */
-router.get('/:currency/balance', catchAsync(async (req, res) => {
+router.get('/:currency/balance', catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const { currency } = req.params;
 
   if (!['NGN', 'USD', 'GBP', 'EUR'].includes(currency)) {
@@ -193,7 +195,7 @@ router.get('/:currency/balance', catchAsync(async (req, res) => {
   const wallet = await WalletService.getWallet(
     req.user._id,
     req.tenant._id,
-    currency
+    currency as Currency
   );
 
   const balance = await WalletService.getWalletBalance(wallet._id);
@@ -241,7 +243,7 @@ router.get('/:currency/balance', catchAsync(async (req, res) => {
 router.post('/:currency/fund', [
   body('amount').isNumeric().isFloat({ min: 1 }).withMessage('Amount must be greater than 0'),
   body('description').trim().isLength({ min: 1 }).withMessage('Description is required')
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -260,10 +262,9 @@ router.post('/:currency/fund', [
   const wallet = await WalletService.getWallet(
     req.user._id,
     req.tenant._id,
-    currency
+    currency as Currency
   );
 
-  const Transaction = require('../models/Transaction');
   const reference = Transaction.generateReference('FUND');
 
   const result = await WalletService.creditWallet(
@@ -327,7 +328,7 @@ router.post('/transfer', [
   body('toCurrency').isIn(['NGN', 'USD', 'GBP', 'EUR']),
   body('amount').isNumeric().isFloat({ min: 1 }),
   body('description').trim().isLength({ min: 1 })
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -344,8 +345,8 @@ router.post('/transfer', [
 
   // Get both wallets
   const [sourceWallet, destinationWallet] = await Promise.all([
-    WalletService.getWallet(req.user._id, req.tenant._id, fromCurrency),
-    WalletService.getWallet(req.user._id, req.tenant._id, toCurrency)
+    WalletService.getWallet(req.user._id, req.tenant._id, fromCurrency as Currency),
+    WalletService.getWallet(req.user._id, req.tenant._id, toCurrency as Currency)
   ]);
 
   // For different currencies, you'd typically apply exchange rates here
@@ -402,7 +403,7 @@ router.get('/:currency/transactions', [
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('type').optional().isIn(['deposit', 'withdrawal', 'transfer'])
-], catchAsync(async (req, res) => {
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
     throw new AppError('Validation failed', 400);
@@ -418,11 +419,10 @@ router.get('/:currency/transactions', [
   const wallet = await WalletService.getWallet(
     req.user._id,
     req.tenant._id,
-    currency
+    currency as Currency
   );
 
-  const Transaction = require('../models/Transaction');
-  const query = {
+  const query: any = {
     $or: [
       { sourceWallet: wallet._id },
       { destinationWallet: wallet._id }
@@ -434,13 +434,13 @@ router.get('/:currency/transactions', [
     query.type = type;
   }
 
-  const skip = (page - 1) * limit;
+  const skip = (Number(page) - 1) * Number(limit);
 
   const [transactions, total] = await Promise.all([
     Transaction.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit))
+      .limit(Number(limit))
       .lean(),
     Transaction.countDocuments(query)
   ]);
@@ -450,14 +450,14 @@ router.get('/:currency/transactions', [
     data: {
       transactions,
       pagination: {
-        current: parseInt(page),
-        pages: Math.ceil(total / limit),
+        current: Number(page),
+        pages: Math.ceil(total / Number(limit)),
         total,
-        hasNext: page * limit < total,
-        hasPrev: page > 1
+        hasNext: Number(page) * Number(limit) < total,
+        hasPrev: Number(page) > 1
       }
     }
   });
 }));
 
-module.exports = router;
+export default router;
