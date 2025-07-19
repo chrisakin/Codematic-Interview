@@ -3,6 +3,10 @@ import cors from 'cors';
 import helmet from 'helmet';
 import mongoSanitize from 'express-mongo-sanitize';
 import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 import connectDB from '@/config/database';
 import connectRedis from '@/config/redis';
@@ -33,7 +37,9 @@ app.use(cors({
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
 });
 app.use('/api/', limiter);
 
@@ -59,7 +65,8 @@ app.get('/health', (req, res) => {
   res.status(200).json({
     status: 'OK',
     timestamp: new Date().toISOString(),
-    uptime: process.uptime()
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0'
   });
 });
 
@@ -76,7 +83,7 @@ async function startServer(): Promise<void> {
     await connectRedis();
     
     // Start background job processor
-    require('@/jobs/processor');
+    await import('@/jobs/processor');
     
     app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT}`);
@@ -89,8 +96,8 @@ async function startServer(): Promise<void> {
 }
 
 // Handle unhandled promise rejections
-process.on('unhandledRejection', (err: Error, promise: Promise<any>) => {
-  logger.error('Unhandled Rejection at:', promise, 'reason:', err);
+process.on('unhandledRejection', (err: Error, Promise: Promise<any>) => {
+  logger.error('Unhandled Rejection at:', Promise, 'reason:', err);
   process.exit(1);
 });
 

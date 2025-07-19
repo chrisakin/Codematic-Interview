@@ -2,10 +2,11 @@ import { Queue, Worker, Job } from 'bullmq';
 import { getRedisClient } from '@/config/redis';
 import logger from '@/config/logger';
 import { IJobData, IJobOptions } from '@/types';
+import { RedisClientType } from 'redis';
 
 // Job queues
 const transactionQueue = new Queue('transaction-processing', {
-  connection: getRedisClient(),
+  connection: getRedisClient() as any,
   defaultJobOptions: {
     removeOnComplete: 100,
     removeOnFail: 50,
@@ -18,7 +19,7 @@ const transactionQueue = new Queue('transaction-processing', {
 });
 
 const webhookQueue = new Queue('webhook-notifications', {
-  connection: getRedisClient(),
+  connection: getRedisClient() as any,
   defaultJobOptions: {
     removeOnComplete: 100,
     removeOnFail: 50,
@@ -31,7 +32,7 @@ const webhookQueue = new Queue('webhook-notifications', {
 });
 
 const notificationQueue = new Queue('notifications', {
-  connection: getRedisClient(),
+  connection: getRedisClient() as any,
   defaultJobOptions: {
     removeOnComplete: 50,
     removeOnFail: 25,

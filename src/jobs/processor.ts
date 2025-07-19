@@ -1,6 +1,7 @@
 import { Worker, Job } from 'bullmq';
 import { getRedisClient } from '@/config/redis';
 import logger from '@/config/logger';
+import { RedisClientType } from 'redis';
 
 // Import job handlers
 import TransactionService from '@/services/TransactionService';
@@ -43,7 +44,7 @@ const transactionWorker = new Worker('transaction-processing', async (job: Job) 
     throw error;
   }
 }, {
-  connection: getRedisClient(),
+  connection: getRedisClient() as any,
   concurrency: 5, // Process up to 5 jobs concurrently
   maxStalledCount: 3,
   stalledInterval: 30000,
@@ -91,7 +92,7 @@ const webhookWorker = new Worker('webhook-notifications', async (job: Job) => {
     throw error;
   }
 }, {
-  connection: getRedisClient(),
+  connection: getRedisClient() as any,
   concurrency: 10, // Higher concurrency for webhooks
   maxStalledCount: 3,
   stalledInterval: 30000,
@@ -138,7 +139,7 @@ const notificationWorker = new Worker('notifications', async (job: Job) => {
     throw error;
   }
 }, {
-  connection: getRedisClient(),
+  connection: getRedisClient() as any,
   concurrency: 15, // High concurrency for notifications
   maxStalledCount: 2,
   stalledInterval: 30000,

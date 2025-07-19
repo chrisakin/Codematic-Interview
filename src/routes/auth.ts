@@ -366,7 +366,7 @@ router.post('/register-tenant', [
   }
 
   // Generate API keys
-  const crypto = require('crypto');
+  const crypto = await import('crypto');
   const apiKey = `pk_${crypto.randomBytes(20).toString('hex')}`;
   const secretKey = `sk_${crypto.randomBytes(32).toString('hex')}`;
 

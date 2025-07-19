@@ -44,7 +44,7 @@ const handleJWTExpiredError = (): AppError =>
 
 const sendErrorDev = (err: AppError, req: Request, res: Response): Response => {
   // Log error for development
-  console.error('ERROR 💥', err);
+  logger.error('ERROR 💥', err);
   
   return res.status(err.statusCode).json({
     status: err.status,
@@ -69,7 +69,7 @@ const sendErrorProd = (err: AppError, req: Request, res: Response): Response => 
   }
   
   // Programming or other unknown error: don't leak error details
-  logger.error('ERROR 💥', {
+  logger.error('ERROR', {
     error: err,
     request: {
       method: req.method,
@@ -115,14 +115,20 @@ export const notFound = (req: Request, res: Response, next: NextFunction): void 
 };
 
 // Global unhandled rejection handler
-process.on('unhandledRejection', (err: Error, promise: Promise<any>) => {
+const handleUnhandledRejection = (err: Error, promise: Promise<any>) => {
   logger.error('Unhandled Rejection at:', promise, 'reason:', err);
   // Close server & exit process
   process.exit(1);
-});
+};
 
 // Global uncaught exception handler
-process.on('uncaughtException', (err: Error) => {
+const handleUncaughtException = (err: Error) => {
   logger.error('Uncaught Exception thrown:', err);
   process.exit(1);
-});
+};
+
+// Only register handlers if this module is being imported
+if (typeof process !== 'undefined') {
+  process.on('unhandledRejection', handleUnhandledRejection);
+  process.on('uncaughtException', handleUncaughtException);
+}

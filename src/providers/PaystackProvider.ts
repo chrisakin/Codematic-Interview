@@ -24,6 +24,11 @@ class PaystackProvider implements IPaymentProvider {
 
   constructor(config: IProviderConfig) {
     this.config = config;
+    
+    if (!config.secretKey) {
+      throw new AppError('Paystack secret key is required', 400);
+    }
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -189,6 +194,11 @@ class PaystackProvider implements IPaymentProvider {
 
   async verifyWebhook(payload: any, signature: string): Promise<boolean> {
     try {
+      if (!this.config.webhookSecret) {
+        logger.warn('Webhook secret not configured for Paystack');
+        return false;
+      }
+      
       const hash = crypto
         .createHmac('sha512', this.config.webhookSecret!)
         .update(JSON.stringify(payload))

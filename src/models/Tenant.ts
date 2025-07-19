@@ -94,7 +94,9 @@ tenantSchema.methods.isActive = function(this: ITenant): boolean {
 tenantSchema.methods.toSafeJSON = function(this: ITenant): Partial<ITenant> {
   const tenant = this.toObject();
   delete tenant.secretKey;
-  delete tenant.providerConfigs;
+  if (tenant.providerConfigs) {
+    delete tenant.providerConfigs;
+  }
   return tenant;
 };
 

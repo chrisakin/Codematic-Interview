@@ -5,6 +5,7 @@ export class AppError extends Error {
   public statusCode: number;
   public status: string;
   public isOperational: boolean;
+  public type: string;
 
   constructor(message: string, statusCode: number) {
     super(message);
@@ -12,14 +13,15 @@ export class AppError extends Error {
     this.statusCode = statusCode;
     this.status = `${statusCode}`.startsWith('4') ? 'fail' : 'error';
     this.isOperational = true;
+    this.type = 'general_error';
     
     Error.captureStackTrace(this, this.constructor);
   }
 }
 
 export class ValidationError extends AppError {
-  public field?: string;
-  public type: string;
+  public field: string | undefined;
+  public override type: string;
 
   constructor(message: string, field?: string) {
     super(message, 400);
@@ -29,7 +31,7 @@ export class ValidationError extends AppError {
 }
 
 export class AuthenticationError extends AppError {
-  public type: string;
+  public override type: string;
 
   constructor(message: string = 'Authentication failed') {
     super(message, 401);
@@ -38,7 +40,7 @@ export class AuthenticationError extends AppError {
 }
 
 export class AuthorizationError extends AppError {
-  public type: string;
+  public override type: string;
 
   constructor(message: string = 'Access denied') {
     super(message, 403);
@@ -47,7 +49,7 @@ export class AuthorizationError extends AppError {
 }
 
 export class NotFoundError extends AppError {
-  public type: string;
+  public override type: string;
 
   constructor(resource: string = 'Resource') {
     super(`${resource} not found`, 404);
@@ -56,7 +58,7 @@ export class NotFoundError extends AppError {
 }
 
 export class ConflictError extends AppError {
-  public type: string;
+  public override type: string;
 
   constructor(message: string) {
     super(message, 409);
@@ -65,7 +67,7 @@ export class ConflictError extends AppError {
 }
 
 export class RateLimitError extends AppError {
-  public type: string;
+  public override type: string;
 
   constructor(message: string = 'Too many requests') {
     super(message, 429);
@@ -75,7 +77,7 @@ export class RateLimitError extends AppError {
 
 export class ExternalServiceError extends AppError {
   public service: string;
-  public type: string;
+  public override type: string;
 
   constructor(service: string, message: string) {
     super(`${service} service error: ${message}`, 502);
@@ -85,7 +87,7 @@ export class ExternalServiceError extends AppError {
 }
 
 export class DatabaseError extends AppError {
-  public type: string;
+  public override type: string;
 
   constructor(message: string = 'Database operation failed') {
     super(message, 500);
@@ -94,8 +96,8 @@ export class DatabaseError extends AppError {
 }
 
 export class PaymentError extends AppError {
-  public provider?: string;
-  public type: string;
+  public provider: string | undefined;
+  public override type: string;
 
   constructor(message: string, provider?: string) {
     super(message, 400);
@@ -107,7 +109,7 @@ export class PaymentError extends AppError {
 export class InsufficientFundsError extends AppError {
   public available: number;
   public required: number;
-  public type: string;
+  public override type: string;
 
   constructor(available: number, required: number) {
     super(`Insufficient funds. Available: ${available}, Required: ${required}`, 400);
@@ -119,8 +121,8 @@ export class InsufficientFundsError extends AppError {
 
 export class FraudError extends AppError {
   public reason: string;
-  public riskScore?: number;
-  public type: string;
+  public riskScore: number | undefined;
+  public override type: string;
 
   constructor(reason: string, riskScore?: number) {
     super(`Transaction blocked due to fraud detection: ${reason}`, 403);

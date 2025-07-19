@@ -1,5 +1,7 @@
 import { Schema, model } from 'mongoose';
-import { ITransaction, ITransactionFees, IFormattedAmount, TransactionType, TransactionStatus, Currency, PaymentProvider, PaymentMethod, WebhookStatus } from '@/types';
+import mongoose from 'mongoose';
+import { ITransaction, ITransactionFees, IFormattedAmount, TransactionType, TransactionStatus, Currency, PaymentProvider, PaymentMethod, WebhookStatus, ITransactionModel } from '@/types';
+import { Types } from 'mongoose';
 
 const transactionSchema = new Schema<ITransaction>({
   reference: {
@@ -182,8 +184,11 @@ transactionSchema.statics.generateReference = function(prefix: string = 'TXN'): 
   return `${prefix}_${timestamp}_${random}`.toUpperCase();
 };
 
-transactionSchema.statics.findByReference = function(reference: string, tenant: string) {
+transactionSchema.statics.findByReference = function(reference: string, tenant: Types.ObjectId): Promise<ITransaction | null> {
   return this.findOne({ reference, tenant });
 };
 
-export default model<ITransaction>('Transaction', transactionSchema);
+interface ITransactionDocument extends ITransaction {}
+interface ITransactionModelType extends ITransactionModel {}
+
+export default model<ITransactionDocument, ITransactionModelType>('Transaction', transactionSchema);

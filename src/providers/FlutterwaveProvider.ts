@@ -24,6 +24,11 @@ class FlutterwaveProvider implements IPaymentProvider {
 
   constructor(config: IProviderConfig) {
     this.config = config;
+    
+    if (!config.secretKey) {
+      throw new AppError('Flutterwave secret key is required', 400);
+    }
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -185,6 +190,11 @@ class FlutterwaveProvider implements IPaymentProvider {
 
   async verifyWebhook(payload: any, signature: string): Promise<boolean> {
     try {
+      if (!this.config.webhookSecret) {
+        logger.warn('Webhook secret not configured for Flutterwave');
+        return false;
+      }
+      
       const secretHash = this.config.webhookSecret!;
       const hash = crypto
         .createHmac('sha256', secretHash)

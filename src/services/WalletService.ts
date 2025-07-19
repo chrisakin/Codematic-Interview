@@ -6,13 +6,14 @@ import logger from '@/config/logger';
 import { AppError } from '@/utils/errors';
 import { IWallet, ITransaction, Currency, IFormattedBalance } from '@/types';
 import { Types } from 'mongoose';
+import { RedisClientType } from 'redis';
 
 class WalletService {
-  private _redis: any = null;
+  private _redis: RedisClientType | null = null;
   private lockValue: string | null = null;
 
   // Lazy initialization of Redis client
-  get redis() {
+  get redis(): RedisClientType {
     if (!this._redis) {
       this._redis = getRedisClient();
     }
@@ -332,7 +333,13 @@ class WalletService {
   async getWalletBalance(walletId: Types.ObjectId): Promise<IFormattedBalance> {
     try {
       const cacheKey = `wallet_balance:${walletId}`;
-      const cached = await this.redis.get(cacheKey);
+      let cached: string | null = null;
+      
+      try {
+        cached = await this.redis.get(cacheKey);
+      } catch (error) {
+        logger.warn('Redis cache read failed:', error);
+      }
       
       if (cached) {
         return JSON.parse(cached);
@@ -346,7 +353,11 @@ class WalletService {
       const balance = wallet.formatBalance();
       
       // Cache for 1 minute
-      await this.redis.setEx(cacheKey, 60, JSON.stringify(balance));
+      try {
+        await this.redis.setEx(cacheKey, 60, JSON.stringify(balance));
+      } catch (error) {
+        logger.warn('Redis cache write failed:', error);
+      }
       
       return balance;
     } catch (error) {
@@ -409,10 +420,7 @@ class WalletService {
             return 0
           end
         `;
-        await this.redis.eval(script, {
-          keys: [lockKey],
-          arguments: [this.lockValue]
-        });
+        await this.redis.eval(script, 1, [lockKey], [this.lockValue]);
         this.lockValue = null;
       }
     } catch (error) {

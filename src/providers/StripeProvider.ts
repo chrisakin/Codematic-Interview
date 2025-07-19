@@ -22,6 +22,11 @@ class StripeProvider implements IPaymentProvider {
 
   constructor(config: IProviderConfig) {
     this.config = config;
+    
+    if (!config.secretKey) {
+      throw new AppError('Stripe secret key is required', 400);
+    }
+    
     this.client = axios.create({
       baseURL: this.baseURL,
       headers: {
@@ -144,6 +149,11 @@ class StripeProvider implements IPaymentProvider {
 
   async verifyWebhook(payload: any, signature: string): Promise<boolean> {
     try {
+      if (!this.config.webhookSecret) {
+        logger.warn('Webhook secret not configured for Stripe');
+        return false;
+      }
+      
       const elements = signature.split(',');
       let timestamp: string | undefined;
       let signatures: string[] = [];

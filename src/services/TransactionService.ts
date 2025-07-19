@@ -12,6 +12,7 @@ import {
   ITransaction, 
   IWallet, 
   ITransactionInitData, 
+  ITransactionUpdateData,
   ITransactionFilters, 
   IPaginationOptions, 
   IPaginationResult,
@@ -19,9 +20,10 @@ import {
   TransactionStatus,
   Types
 } from '@/types';
+import { RedisClientType } from 'redis';
 
 class TransactionService {
-  private redis: any;
+  private redis: RedisClientType;
 
   constructor() {
     this.redis = getRedisClient();
@@ -341,7 +343,7 @@ class TransactionService {
           { reference },
           { providerReference: reference }
         ],
-        tenant: tenantId
+        tenant: new Types.ObjectId(tenantId)
       }) as ITransaction;
       
       if (!transaction) {
@@ -361,13 +363,17 @@ class TransactionService {
     }
   }
 
-  async updateTransactionFromWebhook(transaction: ITransaction, status: string, webhookData: any): Promise<void> {
+  private async updateTransactionFromWebhook(transaction: ITransaction, status: string, webhookData: any): Promise<void> {
     const session = await mongoose.startSession();
     
     try {
       session.startTransaction();
       
       const updatedTransaction = await Transaction.findById(transaction._id).session(session) as ITransaction;
+      
+      if (!updatedTransaction) {
+        throw new AppError('Transaction not found', 404);
+      }
       
       switch (status) {
         case 'success':
@@ -440,7 +446,11 @@ class TransactionService {
     
     if (transaction) {
       // Cache for 5 minutes
-      await this.redis.setEx(cacheKey, 300, JSON.stringify(transaction));
+      try {
+        await this.redis.setEx(cacheKey, 300, JSON.stringify(transaction));
+      } catch (error) {
+        logger.warn('Redis cache write failed:', error);
+      }
     }
     
     return transaction;

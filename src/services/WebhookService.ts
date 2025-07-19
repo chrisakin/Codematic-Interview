@@ -6,6 +6,7 @@ import { addJobSimple as addJob } from '@/jobs/queue';
 import { AppError } from '@/utils/errors';
 import { ITransaction, ITenant, IUser, IWebhookPayload, ITransactionStats } from '@/types';
 import { Types } from 'mongoose';
+import crypto from 'crypto';
 
 class WebhookService {
   private maxRetries: number = 5;
@@ -100,7 +101,6 @@ class WebhookService {
   }
 
   generateSignature(payload: IWebhookPayload, secretKey: string): string {
-    const crypto = require('crypto');
     const payloadString = JSON.stringify(payload);
     return crypto
       .createHmac('sha256', secretKey)
@@ -172,7 +172,7 @@ class WebhookService {
 
   async processIncomingWebhook(provider: string, payload: any, signature: string, tenantId: string): Promise<any> {
     try {
-      const TransactionService = (await import('./TransactionService')).default;
+      const { default: TransactionService } = await import('./TransactionService');
       
       // Handle webhook using TransactionService
       const result = await TransactionService.handleWebhook(

@@ -1,491 +1,406 @@
-import { Document, Types } from 'mongoose';
-import { Request } from 'express';
+import express, { Request, Response } from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import rateLimit from 'express-rate-limit';
+import { body, validationResult } from 'express-validator';
 
-// Base interfaces
-export interface ITimestamps {
-  createdAt: Date;
-  updatedAt: Date;
-}
+import User from '@/models/User';
+import Tenant from '@/models/Tenant';
+import { authenticate, authenticateApiKey } from '@/middleware/auth';
+import { AppError, catchAsync } from '@/utils/errors';
+import logger from '@/config/logger';
+import { IAuthenticatedRequest, IUser, ITenant } from '@/types';
 
-// Tenant interfaces
-export interface ITenant extends Document, ITimestamps {
-  name: string;
-  email: string;
-  businessType: 'ecommerce' | 'fintech' | 'marketplace' | 'saas';
-  status: 'active' | 'suspended' | 'pending';
-  apiKey: string;
-  secretKey: string;
-  settings: ITenantSettings;
-  providerConfigs: IProviderConfigs;
-  isActive(): boolean;
-  toSafeJSON(): Partial<ITenant>;
-}
+const router = express.Router();
 
-export interface ITenantSettings {
-  webhookUrl?: string;
-  enabledProviders: Array<'paystack' | 'flutterwave' | 'stripe'>;
-  rateLimit: {
-    requests: number;
-    windowMs: number;
-  };
-  fraudDetection: {
-    enabled: boolean;
-    maxTransactionAmount: number;
-    dailyTransactionLimit: number;
-  };
-}
+// Rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // limit each IP to 10 requests per windowMs
+  message: 'Too many authentication attempts, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false
+});
 
-export interface IProviderConfigs {
-  paystack?: IProviderConfig;
-  flutterwave?: IProviderConfig;
-  stripe?: IProviderConfig;
-}
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Register a new user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - firstName
+ *               - lastName
+ *               - tenantId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *               firstName:
+ *                 type: string
+ *               lastName:
+ *                 type: string
+ *               phoneNumber:
+ *                 type: string
+ *               tenantId:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: User registered successfully
+ */
+router.post('/register', [
+  authLimiter,
+  body('email').isEmail().normalizeEmail(),
+  body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
+  body('firstName').trim().isLength({ min: 1 }).withMessage('First name is required'),
+  body('lastName').trim().isLength({ min: 1 }).withMessage('Last name is required'),
+  body('tenantId').isMongoId().withMessage('Valid tenant ID required')
+], catchAsync(async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new AppError('Validation failed', 400);
+  }
 
-export interface IProviderConfig {
-  publicKey?: string;
-  secretKey?: string;
-  webhookSecret?: string;
-}
+  const { email, password, firstName, lastName, phoneNumber, tenantId } = req.body;
 
-// User interfaces
-export interface IUser extends Document, ITimestamps {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  phoneNumber?: string;
-  dateOfBirth?: Date;
-  address?: IAddress;
-  tenant: Types.ObjectId | ITenant;
-  status: 'active' | 'suspended' | 'pending';
-  kycStatus: 'pending' | 'verified' | 'rejected';
-  kycData?: IKycData;
-  lastLoginAt?: Date;
-  loginAttempts: number;
-  lockUntil?: Date;
-  isLocked: boolean;
-  comparePassword(candidatePassword: string): Promise<boolean>;
-  toSafeJSON(): Partial<IUser>;
-}
+  // Check if tenant exists and is active
+  const tenant = await Tenant.findById(tenantId) as ITenant;
+  if (!tenant) {
+    throw new AppError('Tenant not found', 404);
+  }
 
-export interface IAddress {
-  street?: string;
-  city?: string;
-  state?: string;
-  country?: string;
-  zipCode?: string;
-}
+  if (!tenant.isActive()) {
+    throw new AppError('Tenant is not active', 400);
+  }
 
-export interface IKycData {
-  documentType?: string;
-  documentNumber?: string;
-  verifiedAt?: Date;
-}
+  // Check if user already exists for this tenant
+  const existingUser = await User.findOne({ email, tenant: tenantId }) as IUser;
+  if (existingUser) {
+    throw new AppError('User already exists for this tenant', 409);
+  }
 
-// Wallet interfaces
-export interface IWallet extends Document, ITimestamps {
-  user: Types.ObjectId | IUser;
-  tenant: Types.ObjectId | ITenant;
-  currency: Currency;
-  balance: number;
-  ledgerBalance: number;
-  status: 'active' | 'suspended' | 'frozen';
-  limits: IWalletLimits;
-  virtualAccounts: IVirtualAccount[];
-  lastTransactionAt?: Date;
-  version: number;
-  canTransact(amount: number): boolean;
-  checkDailyLimit(amount: number): boolean;
-  updateDailyUsage(amount: number): void;
-  formatBalance(): IFormattedBalance;
-}
+  // Create user
+  const user = new User({
+    email,
+    password,
+    firstName,
+    lastName,
+    phoneNumber,
+    tenant: tenantId,
+    status: 'active' // Auto-activate for demo purposes
+  }) as IUser;
 
-export interface IWalletLimits {
-  daily: ILimit;
-  monthly: ILimit;
-}
+  await user.save();
 
-export interface ILimit {
-  amount: number;
-  used: number;
-  lastReset: Date;
-}
+  // Generate JWT token
+  const token = jwt.sign(
+    { userId: user._id, tenantId },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
 
-export interface IVirtualAccount {
-  provider: 'paystack' | 'flutterwave';
-  accountNumber: string;
-  bankName: string;
-  accountName: string;
-  isActive: boolean;
-  createdAt: Date;
-}
+  logger.info(`User registered: ${email} for tenant ${tenantId}`);
 
-export interface IFormattedBalance {
-  balance: number;
-  ledgerBalance: number;
-  currency: Currency;
-}
+  res.status(201).json({
+    status: 'success',
+    message: 'User registered successfully',
+    data: {
+      user: user.toSafeJSON(),
+      token
+    }
+  });
+}));
 
-// Transaction interfaces
-export interface ITransaction extends Document, ITimestamps {
-  reference: string;
-  tenant: Types.ObjectId | ITenant;
-  user?: Types.ObjectId | IUser;
-  type: TransactionType;
-  status: TransactionStatus;
-  amount: number;
-  currency: Currency;
-  description: string;
-  sourceWallet?: Types.ObjectId | IWallet;
-  destinationWallet?: Types.ObjectId | IWallet;
-  provider?: PaymentProvider;
-  providerReference?: string;
-  providerResponse?: any;
-  paymentMethod?: PaymentMethod;
-  paymentDetails?: any;
-  fees: ITransactionFees;
-  metadata?: any;
-  clientIp?: string;
-  userAgent?: string;
-  idempotencyKey?: string;
-  webhookStatus: WebhookStatus;
-  webhookAttempts: number;
-  webhookLastAttempt?: Date;
-  riskScore?: number;
-  fraudFlags: string[];
-  processedAt?: Date;
-  failedAt?: Date;
-  cancelledAt?: Date;
-  parentTransaction?: Types.ObjectId | ITransaction;
-  formattedAmount: IFormattedAmount;
-  canBeProcessed(): boolean;
-  markAsProcessing(): void;
-  markAsCompleted(): void;
-  markAsFailed(reason?: string): void;
-  incrementWebhookAttempt(): void;
-}
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login user
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - password
+ *               - tenantId
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *               tenantId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Login successful
+ */
+router.post('/login', [
+  authLimiter,
+  body('email').isEmail().normalizeEmail(),
+  body('password').notEmpty().withMessage('Password is required'),
+  body('tenantId').isMongoId().withMessage('Valid tenant ID required')
+], catchAsync(async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new AppError('Validation failed', 400);
+  }
 
-export interface ITransactionFees {
-  platform: number;
-  provider: number;
-  total: number;
-}
+  const { email, password, tenantId } = req.body;
 
-export interface IFormattedAmount {
-  amount: number;
-  currency: Currency;
-  formatted: string;
-}
+  // Find user with tenant
+  const user = await User.findOne({ email, tenant: tenantId }).populate('tenant') as IUser;
+  
+  if (!user) {
+    throw new AppError('Invalid credentials', 401);
+  }
 
-// Enums and types
-export type Currency = 'NGN' | 'USD' | 'GBP' | 'EUR';
-export type TransactionType = 'deposit' | 'withdrawal' | 'transfer' | 'fee' | 'refund';
-export type TransactionStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
-export type PaymentProvider = 'paystack' | 'flutterwave' | 'stripe' | 'internal';
-export type PaymentMethod = 'card' | 'bank_transfer' | 'mobile_money' | 'virtual_account' | 'wallet';
-export type WebhookStatus = 'pending' | 'sent' | 'failed';
+  // Check if user account is active
+  if (user.status !== 'active') {
+    throw new AppError('Account is not active', 401);
+  }
 
-// Service interfaces
-export interface IPaymentProvider {
-  initializePayment(data: IPaymentInitData): Promise<IPaymentInitResponse>;
-  verifyPayment(reference: string): Promise<IPaymentVerificationResponse>;
-  initiatePayout(data: IPayoutData): Promise<IPayoutResponse>;
-  createVirtualAccount?(data: IVirtualAccountData): Promise<IVirtualAccountResponse>;
-  verifyWebhook(payload: any, signature: string): Promise<boolean>;
-  parseWebhookEvent(payload: any): IWebhookEvent;
-  getBanks?(): Promise<IBank[]>;
-  resolveAccountNumber?(accountNumber: string, bankCode: string): Promise<IAccountResolution>;
-}
+  // Check if tenant is active
+  const tenant = user.tenant as ITenant;
+  if (!tenant.isActive()) {
+    throw new AppError('Tenant account is not active', 401);
+  }
 
-export interface IPaymentInitData {
-  amount: number;
-  currency: Currency;
-  reference: string;
-  email: string;
-  metadata?: any;
-}
+  // Verify password
+  const isPasswordValid = await user.comparePassword(password);
+  if (!isPasswordValid) {
+    throw new AppError('Invalid credentials', 401);
+  }
 
-export interface IPaymentInitResponse {
-  reference: string;
-  authorizationUrl: string;
-  accessCode?: string;
-  clientSecret?: string;
-  paymentIntentId?: string;
-  provider: PaymentProvider;
-  providerResponse: any;
-}
+  // Generate JWT token
+  const token = jwt.sign(
+    { userId: user._id, tenantId },
+    process.env.JWT_SECRET || 'your-secret-key',
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
 
-export interface IPaymentVerificationResponse {
-  reference: string;
-  status: 'completed' | 'failed';
-  amount: number;
-  currency: Currency;
-  paidAt: string | number;
-  channel: string;
-  providerResponse: any;
-}
+  logger.info(`User logged in: ${email} for tenant ${tenantId}`);
 
-export interface IPayoutData {
-  amount: number;
-  currency: Currency;
-  reference: string;
-  bankDetails: IBankDetails;
-}
+  res.json({
+    status: 'success',
+    message: 'Login successful',
+    data: {
+      user: user.toSafeJSON(),
+      tenant: tenant.toSafeJSON(),
+      token
+    }
+  });
+}));
 
-export interface IPayoutResponse {
-  reference: string;
-  status: string;
-  transferId?: string;
-  provider: PaymentProvider;
-  providerResponse: any;
-}
+/**
+ * @swagger
+ * /api/auth/profile:
+ *   get:
+ *     summary: Get user profile
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: User profile retrieved successfully
+ */
+router.get('/profile', authenticate, catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  res.json({
+    status: 'success',
+    data: {
+      user: req.user.toSafeJSON(),
+      tenant: req.tenant.toSafeJSON()
+    }
+  });
+}));
 
-export interface IVirtualAccountData {
-  customerId?: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  phoneNumber?: string;
-  preferredBank?: string;
-  bvn?: string;
-}
+/**
+ * @swagger
+ * /api/auth/change-password:
+ *   patch:
+ *     summary: Change user password
+ *     tags: [Authentication]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *               newPassword:
+ *                 type: string
+ *                 minLength: 8
+ *     responses:
+ *       200:
+ *         description: Password changed successfully
+ */
+router.patch('/change-password', [
+  authenticate,
+  body('currentPassword').notEmpty().withMessage('Current password is required'),
+  body('newPassword').isLength({ min: 8 }).withMessage('New password must be at least 8 characters')
+], catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new AppError('Validation failed', 400);
+  }
 
-export interface IVirtualAccountResponse {
-  accountNumber: string;
-  accountName: string;
-  bankName: string;
-  bankCode?: string;
-  provider: PaymentProvider;
-  providerResponse: any;
-}
+  const { currentPassword, newPassword } = req.body;
 
-export interface IWebhookEvent {
-  event: string;
-  reference: string;
-  status: 'success' | 'failed' | 'pending';
-  amount: number;
-  currency: Currency;
-  customer?: any;
-  providerData: any;
-}
+  // Verify current password
+  const isCurrentPasswordValid = await req.user.comparePassword(currentPassword);
+  if (!isCurrentPasswordValid) {
+    throw new AppError('Current password is incorrect', 400);
+  }
 
-export interface IBank {
-  name: string;
-  code: string;
-  slug?: string;
-  provider: PaymentProvider;
-}
+  // Update password
+  req.user.password = newPassword;
+  await req.user.save();
 
-export interface IAccountResolution {
-  accountNumber: string;
-  accountName: string;
-  bankCode: string;
-}
+  logger.info(`Password changed for user: ${req.user.email}`);
 
-export interface IBankDetails {
-  accountName: string;
-  accountNumber: string;
-  bankCode: string;
-  routingNumber?: string;
-  country?: string;
-}
+  res.json({
+    status: 'success',
+    message: 'Password changed successfully'
+  });
+}));
 
-// Request interfaces
-export interface IAuthenticatedRequest extends Request {
-  user: IUser;
-  tenant: ITenant;
-  transaction?: ITransaction;
-  webhookSignature?: string;
-  webhookTimestamp?: string;
-}
+/**
+ * @swagger
+ * /api/auth/verify-token:
+ *   post:
+ *     summary: Verify JWT token
+ *     tags: [Authentication]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *             properties:
+ *               token:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Token is valid
+ */
+router.post('/verify-token', catchAsync(async (req: Request, res: Response) => {
+  const { token } = req.body;
 
-export interface ITransactionInitData {
-  tenantId: Types.ObjectId;
-  userId: Types.ObjectId;
-  type: TransactionType;
-  amount: number;
-  currency: Currency;
-  description: string;
-  paymentMethod: PaymentMethod;
-  metadata?: any;
-  idempotencyKey?: string;
-}
+  if (!token) {
+    throw new AppError('Token is required', 400);
+  }
 
-export interface IRiskAssessment {
-  score: number;
-  flags: string[];
-  shouldBlock: boolean;
-  reason?: string;
-  riskLevel: 'LOW' | 'MEDIUM' | 'HIGH';
-}
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as any;
+    
+    // Check if user still exists
+    const user = await User.findById(decoded.userId).populate('tenant') as IUser;
+    
+    if (!user) {
+      throw new AppError('User no longer exists', 401);
+    }
 
-export interface IFraudCheckData {
-  tenantId: Types.ObjectId;
-  userId: Types.ObjectId;
-  amount: number;
-  currency: Currency;
-  type: TransactionType;
-  paymentMethod: PaymentMethod;
-  metadata?: any;
-}
+    if (user.status !== 'active' || !user.tenant.isActive()) {
+      throw new AppError('Account is not active', 401);
+    }
 
-// Pagination and filtering
-export interface IPaginationOptions {
-  page?: number;
-  limit?: number;
-  sort?: string;
-}
+    res.json({
+      status: 'success',
+      message: 'Token is valid',
+      data: {
+        user: user.toSafeJSON(),
+        tenant: user.tenant.toSafeJSON(),
+        expiresAt: new Date(decoded.exp * 1000)
+      }
+    });
+  } catch (error: any) {
+    if (error.name === 'JsonWebTokenError') {
+      throw new AppError('Invalid token', 401);
+    }
+    if (error.name === 'TokenExpiredError') {
+      throw new AppError('Token expired', 401);
+    }
+    throw error;
+  }
+}));
 
-export interface IPaginationResult<T> {
-  data: T[];
-  pagination: {
-    current: number;
-    pages: number;
-    total: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-}
+// Tenant registration (for platform admin use)
+router.post('/register-tenant', [
+  authenticateApiKey,
+  body('name').trim().isLength({ min: 1 }).withMessage('Tenant name is required'),
+  body('email').isEmail().normalizeEmail(),
+  body('businessType').isIn(['ecommerce', 'fintech', 'marketplace', 'saas'])
+], catchAsync(async (req: Request, res: Response) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    throw new AppError('Validation failed', 400);
+  }
 
-export interface ITransactionFilters {
-  tenantId: Types.ObjectId;
-  userId?: Types.ObjectId;
-  status?: TransactionStatus;
-  type?: TransactionType;
-  startDate?: string;
-  endDate?: string;
-}
+  const { name, email, businessType } = req.body;
 
-// Job interfaces
-export interface IJobData {
-  [key: string]: any;
-}
+  // Check if tenant already exists
+  const existingTenant = await Tenant.findOne({ email }) as ITenant;
+  if (existingTenant) {
+    throw new AppError('Tenant already exists', 409);
+  }
 
-export interface IJobOptions {
-  delay?: number;
-  attempts?: number;
-  backoff?: {
-    type: string;
-    delay: number;
-  };
-  removeOnComplete?: number;
-  removeOnFail?: number;
-  jobId?: string;
-}
+  // Generate API keys
+  const crypto = require('crypto');
+  const apiKey = `pk_${crypto.randomBytes(20).toString('hex')}`;
+  const secretKey = `sk_${crypto.randomBytes(32).toString('hex')}`;
 
-// Configuration interfaces
-export interface IAppConfig {
-  port: number;
-  nodeEnv: string;
-  mongoUri: string;
-  redisUrl: string;
-  jwtSecret: string;
-  jwtExpiresIn: string;
-  allowedOrigins: string[];
-}
+  const tenant = new Tenant({
+    name,
+    email,
+    businessType,
+    apiKey,
+    secretKey,
+    status: 'active',
+    settings: {
+      enabledProviders: ['paystack'],
+      rateLimit: {
+        requests: 1000,
+        windowMs: 900000 // 15 minutes
+      }
+    }
+  }) as ITenant;
 
-export interface IProviderCredentials {
-  publicKey: string;
-  secretKey: string;
-  webhookSecret: string;
-}
+  await tenant.save();
 
-// Error interfaces
-export interface IErrorResponse {
-  status: string;
-  message: string;
-  type?: string;
-  timestamp: string;
-  path?: string;
-  field?: string;
-  provider?: string;
-  details?: any;
-  riskScore?: number;
-  stack?: string;
-}
+  logger.info(`Tenant registered: ${name} (${email})`);
 
-// Notification interfaces
-export interface INotificationData {
-  to: string;
-  subject?: string;
-  template?: string;
-  data?: any;
-  userId?: Types.ObjectId;
-  title?: string;
-  body?: string;
-  channel?: string;
-  level?: 'info' | 'warning' | 'error' | 'success';
-}
+  res.status(201).json({
+    status: 'success',
+    message: 'Tenant registered successfully',
+    data: {
+      tenant: tenant.toSafeJSON(),
+      apiKey: tenant.apiKey
+    }
+  });
+}));
 
-export interface INotificationResult {
-  success: boolean;
-  messageId?: string;
-  provider: string;
-  message?: string;
-}
-
-// Webhook interfaces
-export interface IWebhookPayload {
-  event: string;
-  data: {
-    id: Types.ObjectId;
-    reference: string;
-    type: TransactionType;
-    status: TransactionStatus;
-    amount: number;
-    currency: Currency;
-    description: string;
-    user: {
-      id: Types.ObjectId;
-      email: string;
-      firstName: string;
-      lastName: string;
-    };
-    metadata?: any;
-    createdAt: Date;
-    updatedAt: Date;
-    processedAt?: Date;
-  };
-  timestamp: number;
-}
-
-// Cache interfaces
-export interface ICacheOptions {
-  ttl?: number;
-  prefix?: string;
-}
-
-export interface ILockOptions {
-  ttl?: number;
-  retries?: number;
-  delay?: number;
-}
-
-// Statistics interfaces
-export interface ITransactionStats {
-  pending: number;
-  sent: number;
-  failed: number;
-  totalAttempts: number;
-  successRate: string;
-}
-
-export interface IQueueStats {
-  waiting: number;
-  active: number;
-  completed: number;
-  failed: number;
-  delayed: number;
-}
-
-// Utility types
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-export type RequireAtLeastOne<T, Keys extends keyof T = keyof T> = 
-  Pick<T, Exclude<keyof T, Keys>> & 
-  { [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>> }[Keys];
-
-export type Nullable<T> = T | null;
-export type Optional<T> = T | undefined;
+export default router;

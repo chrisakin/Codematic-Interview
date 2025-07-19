@@ -5,9 +5,10 @@ import { getRedisClient } from '@/config/redis';
 import logger from '@/config/logger';
 import { IFraudCheckData, IRiskAssessment, IUser } from '@/types';
 import { Types } from 'mongoose';
+import { RedisClientType } from 'redis';
 
 class FraudDetectionService {
-  private redis: any;
+  private redis: RedisClientType;
   private riskThresholds = {
     LOW: 30,
     MEDIUM: 60,
@@ -96,9 +97,16 @@ class FraudDetectionService {
   async checkTransactionVelocity(userId: Types.ObjectId, tenantId: Types.ObjectId): Promise<{ score: number; flags: string[] }> {
     try {
       const cacheKey = `velocity:${userId}:${tenantId}`;
-      let velocityData = await this.redis.get(cacheKey);
+      let velocityDataStr: string | null = null;
+      let velocityData: { count: number; lastReset: number };
       
-      if (!velocityData) {
+      try {
+        velocityDataStr = await this.redis.get(cacheKey);
+      } catch (error) {
+        logger.warn('Redis velocity check failed:', error);
+      }
+      
+      if (!velocityDataStr) {
         // Get recent transactions from database
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         const recentTransactions = await Transaction.find({
@@ -109,11 +117,19 @@ class FraudDetectionService {
         }).countDocuments();
         
         velocityData = { count: recentTransactions, lastReset: Date.now() };
-        await this.redis.setEx(cacheKey, 3600, JSON.stringify(velocityData)); // 1 hour TTL
+        try {
+          await this.redis.setEx(cacheKey, 3600, JSON.stringify(velocityData)); // 1 hour TTL
+        } catch (error) {
+          logger.warn('Redis velocity cache write failed:', error);
+        }
       } else {
-        velocityData = JSON.parse(velocityData);
+        velocityData = JSON.parse(velocityDataStr);
         velocityData.count += 1;
-        await this.redis.setEx(cacheKey, 3600, JSON.stringify(velocityData));
+        try {
+          await this.redis.setEx(cacheKey, 3600, JSON.stringify(velocityData));
+        } catch (error) {
+          logger.warn('Redis velocity cache update failed:', error);
+        }
       }
       
       const flags: string[] = [];
@@ -252,7 +268,13 @@ class FraudDetectionService {
       }
       
       // Check if IP is in blacklist (Redis set)
-      const isBlacklisted = await this.redis.sIsMember('blacklisted_ips', clientIp);
+      let isBlacklisted = false;
+      try {
+        isBlacklisted = await this.redis.sIsMember('blacklisted_ips', clientIp);
+      } catch (error) {
+        logger.warn('Redis blacklist check failed:', error);
+      }
+      
       if (isBlacklisted) {
         flags.push('BLACKLISTED_IP');
         score += 80;
@@ -267,7 +289,13 @@ class FraudDetectionService {
       // Check device consistency for user
       if (userId) {
         const deviceKey = `device:${userId}`;
-        const knownDevices = await this.redis.sMembers(deviceKey);
+        let knownDevices: string[] = [];
+        
+        try {
+          knownDevices = await this.redis.sMembers(deviceKey);
+        } catch (error) {
+          logger.warn('Redis device check failed:', error);
+        }
         
         const deviceFingerprint = this.generateDeviceFingerprint(clientIp, userAgent);
         
@@ -276,12 +304,20 @@ class FraudDetectionService {
           score += 15;
           
           // Add to known devices
-          await this.redis.sAdd(deviceKey, deviceFingerprint);
-          await this.redis.expire(deviceKey, 86400 * 30); // 30 days
+          try {
+            await this.redis.sAdd(deviceKey, deviceFingerprint);
+            await this.redis.expire(deviceKey, 86400 * 30); // 30 days
+          } catch (error) {
+            logger.warn('Redis device cache update failed:', error);
+          }
         } else if (knownDevices.length === 0) {
           // First time user
-          await this.redis.sAdd(deviceKey, deviceFingerprint);
-          await this.redis.expire(deviceKey, 86400 * 30);
+          try {
+            await this.redis.sAdd(deviceKey, deviceFingerprint);
+            await this.redis.expire(deviceKey, 86400 * 30);
+          } catch (error) {
+            logger.warn('Redis device cache init failed:', error);
+          }
         }
       }
       
@@ -305,7 +341,13 @@ class FraudDetectionService {
       }
       
       // Check if card BIN is in stolen card database
-      const isStolenCard = await this.redis.sIsMember('stolen_cards', cardBin);
+      let isStolenCard = false;
+      try {
+        isStolenCard = await this.redis.sIsMember('stolen_cards', cardBin);
+      } catch (error) {
+        logger.warn('Redis stolen card check failed:', error);
+      }
+      
       if (isStolenCard) {
         flags.push('STOLEN_CARD');
         score += 100; // Immediate block
@@ -313,10 +355,16 @@ class FraudDetectionService {
       
       // Check card usage frequency
       const cardKey = `card:${cardBin}${cardLast4}`;
-      const dailyUsage = await this.redis.incr(`${cardKey}:daily`);
+      let dailyUsage = 1;
       
-      if (dailyUsage === 1) {
-        await this.redis.expire(`${cardKey}:daily`, 86400); // 24 hours
+      try {
+        dailyUsage = await this.redis.incr(`${cardKey}:daily`);
+        
+        if (dailyUsage === 1) {
+          await this.redis.expire(`${cardKey}:daily`, 86400); // 24 hours
+        }
+      } catch (error) {
+        logger.warn('Redis card usage tracking failed:', error);
       }
       
       if (dailyUsage > 5) {
@@ -350,7 +398,7 @@ class FraudDetectionService {
   }
 
   generateDeviceFingerprint(ip: string, userAgent: string): string {
-    const crypto = require('crypto');
+    const crypto = require('crypto') as typeof import('crypto');
     return crypto.createHash('sha256').update(`${ip}:${userAgent}`).digest('hex');
   }
 
@@ -379,17 +427,32 @@ class FraudDetectionService {
 
   // Admin functions for managing fraud rules
   async addToBlacklist(ip: string): Promise<void> {
-    await this.redis.sAdd('blacklisted_ips', ip);
+    try {
+      await this.redis.sAdd('blacklisted_ips', ip);
+    } catch (error) {
+      logger.error('Failed to add IP to blacklist:', error);
+      throw error;
+    }
     logger.info(`IP ${ip} added to blacklist`);
   }
 
   async removeFromBlacklist(ip: string): Promise<void> {
-    await this.redis.sRem('blacklisted_ips', ip);
+    try {
+      await this.redis.sRem('blacklisted_ips', ip);
+    } catch (error) {
+      logger.error('Failed to remove IP from blacklist:', error);
+      throw error;
+    }
     logger.info(`IP ${ip} removed from blacklist`);
   }
 
   async addStolenCard(cardBin: string): Promise<void> {
-    await this.redis.sAdd('stolen_cards', cardBin);
+    try {
+      await this.redis.sAdd('stolen_cards', cardBin);
+    } catch (error) {
+      logger.error('Failed to add card to stolen list:', error);
+      throw error;
+    }
     logger.info(`Card BIN ${cardBin} added to stolen cards list`);
   }
 }

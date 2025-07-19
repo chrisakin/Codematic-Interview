@@ -5,12 +5,17 @@ let redisClient: RedisClientType | null = null;
 
 const connectRedis = async (): Promise<RedisClientType> => {
   try {
+    if (redisClient && redisClient.isOpen) {
+      return redisClient;
+    }
+    
     redisClient = createClient({
       url: process.env.REDIS_URL || 'redis://localhost:6379',
       socket: {
         reconnectStrategy: (retries: number) => {
           if (retries > 10) {
-            return new Error('Retry time exhausted');
+            logger.error('Redis retry time exhausted');
+            return false;
           }
           return Math.min(retries * 100, 3000);
         }
