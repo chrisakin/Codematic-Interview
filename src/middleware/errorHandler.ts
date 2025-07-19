@@ -17,9 +17,16 @@ const handleCastErrorDB = (err: MongooseError.CastError): AppError => {
 };
 
 const handleDuplicateFieldsDB = (err: MongoError): AppError => {
-  const field = Object.keys(err.keyValue || {})[0];
-  const value = err.keyValue?.[field];
-  const message = `Duplicate field value: ${field} = '${value}'. Please use another value!`;
+  const keys = Object.keys(err.keyValue || {});
+  const field = keys[0];
+
+  let message = 'Duplicate field value. Please use another value!';
+
+  if (field && err.keyValue) {
+    const value = err.keyValue[field];
+    message = `Duplicate field value: ${field} = '${value}'. Please use another value!`;
+  }
+
   return new AppError(message, 400);
 };
 
