@@ -45,7 +45,7 @@ export const authenticate = async (req: IAuthenticatedRequest, res: Response, ne
     }
     
     // Check if tenant is active
-    if (!user.tenant.isActive()) {
+    if ((!user.tenant as unknown as ITenant).isActive()) {
       return next(new AppError('Tenant account is not active', 401));
     }
     
@@ -163,7 +163,7 @@ export const optionalAuth = async (req: IAuthenticatedRequest, res: Response, ne
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key') as JWTPayload;
     const user = await User.findById(decoded.userId).populate('tenant') as IUser;
     
-    if (user && user.status === 'active' && user.tenant.isActive()) {
+    if (user && user.status === 'active' && (user.tenant as unknown as ITenant).isActive()) {
       req.user = user;
       req.tenant = user.tenant as ITenant;
     }

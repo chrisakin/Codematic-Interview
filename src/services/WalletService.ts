@@ -5,10 +5,11 @@ import { getRedisClient } from '@/config/redis';
 import logger from '@/config/logger';
 import { AppError } from '@/utils/errors';
 import { IWallet, ITransaction, Currency, IFormattedBalance } from '@/types';
+import { FundWalletDto, TransferBetweenWalletsDto } from '@/dto/wallet.dto';
 import { Types } from 'mongoose';
 import { RedisClientType } from 'redis';
 
-class WalletService {
+export class WalletService {
   private _redis: RedisClientType | null = null;
   private lockValue: string | null = null;
 
@@ -20,7 +21,6 @@ class WalletService {
     return this._redis;
   }
 
-  // Create wallet with Redis caching
   async createWallet(userId: Types.ObjectId, tenantId: Types.ObjectId, currency: Currency = 'NGN'): Promise<IWallet> {
     const session = await mongoose.startSession();
     
@@ -64,7 +64,6 @@ class WalletService {
     }
   }
 
-  // Get wallet with Redis caching and distributed locking
   async getWallet(userId: Types.ObjectId, tenantId: Types.ObjectId, currency: Currency, useCache: boolean = true): Promise<IWallet> {
     const cacheKey = this.getWalletCacheKey(userId, currency);
     
@@ -93,6 +92,69 @@ class WalletService {
     await this.cacheWallet(wallet, 300);
     
     return wallet;
+  }
+
+  async getUserWallets(userId: Types.ObjectId, tenantId: Types.ObjectId, currency?: Currency): Promise<IWallet[]> {
+    const query: any = {
+      user: userId,
+      tenant: tenantId
+    };
+
+    if (currency) {
+      query.currency = currency;
+    }
+
+    const wallets = await Wallet.find(query).lean() as IWallet[];
+
+    // Get formatted balances for each wallet
+    const walletsWithBalances = await Promise.all(
+      wallets.map(async (wallet) => {
+        const balance = await this.getWalletBalance(wallet._id);
+        return {
+          ...wallet,
+          formattedBalance: balance
+        };
+      })
+    );
+
+    return walletsWithBalances;
+  }
+
+  async fundWallet(walletId: Types.ObjectId, dto: FundWalletDto) {
+    // Convert to minor currency unit (cents/kobo)
+    const amountInMinor = Math.round(dto.amount * 100);
+    const reference = Transaction.generateReference('FUND');
+
+    return await this.creditWallet(
+      walletId,
+      amountInMinor,
+      dto.description,
+      reference
+    );
+  }
+
+  async transferBetweenWallets(userId: Types.ObjectId, tenantId: Types.ObjectId, dto: TransferBetweenWalletsDto) {
+    if (dto.fromCurrency === dto.toCurrency) {
+      throw new AppError('Cannot transfer to the same currency wallet', 400);
+    }
+
+    // Convert to minor currency unit
+    const amountInMinor = Math.round(dto.amount * 100);
+
+    // Get both wallets
+    const [sourceWallet, destinationWallet] = await Promise.all([
+      this.getWallet(userId, tenantId, dto.fromCurrency),
+      this.getWallet(userId, tenantId, dto.toCurrency)
+    ]);
+
+    // For different currencies, you'd typically apply exchange rates here
+    // For simplicity, we'll transfer the same amount
+    return await this.transferBetweenWalletIds(
+      sourceWallet._id,
+      destinationWallet._id,
+      amountInMinor,
+      dto.description
+    );
   }
 
   // Credit wallet with optimistic locking and atomic operations
@@ -189,6 +251,40 @@ class WalletService {
       if (shouldCommit) {
         session.endSession();
       }
+    }
+  }
+
+  // Transfer between wallets (atomic transaction)
+  async transferBetweenWalletIds(
+    sourceWalletId: Types.ObjectId, 
+    destinationWalletId: Types.ObjectId, 
+    amount: number, 
+    description: string
+  ): Promise<{ reference: string; amount: number; description: string }> {
+    const session = await mongoose.startSession();
+    
+    try {
+      session.startTransaction();
+      
+      const transferRef = Transaction.generateReference('TRF');
+      
+      // Debit source wallet
+      await this.debitWallet(sourceWalletId, amount, `Transfer out: ${description}`, `${transferRef}_OUT`, session);
+      
+      // Credit destination wallet
+      await this.creditWallet(destinationWalletId, amount, `Transfer in: ${description}`, `${transferRef}_IN`, session);
+      
+      await session.commitTransaction();
+      
+      logger.info(`Transfer completed: ${sourceWalletId} -> ${destinationWalletId}, amount: ${amount}`);
+      return { reference: transferRef, amount, description };
+      
+    } catch (error) {
+      await session.abortTransaction();
+      logger.error('Transfer failed:', error);
+      throw error;
+    } finally {
+      session.endSession();
     }
   }
 
@@ -295,40 +391,6 @@ class WalletService {
     }
   }
 
-  // Transfer between wallets (atomic transaction)
-  async transferBetweenWallets(
-    sourceWalletId: Types.ObjectId, 
-    destinationWalletId: Types.ObjectId, 
-    amount: number, 
-    description: string
-  ): Promise<{ reference: string; amount: number; description: string }> {
-    const session = await mongoose.startSession();
-    
-    try {
-      session.startTransaction();
-      
-      const transferRef = Transaction.generateReference('TRF');
-      
-      // Debit source wallet
-      await this.debitWallet(sourceWalletId, amount, `Transfer out: ${description}`, `${transferRef}_OUT`, session);
-      
-      // Credit destination wallet
-      await this.creditWallet(destinationWalletId, amount, `Transfer in: ${description}`, `${transferRef}_IN`, session);
-      
-      await session.commitTransaction();
-      
-      logger.info(`Transfer completed: ${sourceWalletId} -> ${destinationWalletId}, amount: ${amount}`);
-      return { reference: transferRef, amount, description };
-      
-    } catch (error) {
-      await session.abortTransaction();
-      logger.error('Transfer failed:', error);
-      throw error;
-    } finally {
-      session.endSession();
-    }
-  }
-
   // Get wallet balance from cache or database
   async getWalletBalance(walletId: Types.ObjectId): Promise<IFormattedBalance> {
     try {
@@ -428,5 +490,3 @@ class WalletService {
     }
   }
 }
-
-export default new WalletService();

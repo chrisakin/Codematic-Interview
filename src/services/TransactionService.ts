@@ -1,7 +1,7 @@
 import mongoose, { ClientSession } from 'mongoose';
 import Transaction from '@/models/Transaction';
 import Wallet from '@/models/Wallet';
-import WalletService from './WalletService';
+import { WalletService } from './WalletService';
 import PaymentProviderFactory from '@/providers/PaymentProviderFactory';
 import FraudDetectionService from './FraudDetectionService';
 import { getRedisClient } from '@/config/redis';
@@ -12,7 +12,6 @@ import {
   ITransaction, 
   IWallet, 
   ITransactionInitData, 
-  ITransactionUpdateData,
   ITransactionFilters, 
   IPaginationOptions, 
   IPaginationResult,
@@ -20,13 +19,16 @@ import {
   TransactionStatus,
   Types
 } from '@/types';
+import { GetWalletTransactionsDto } from '@/dto/wallet.dto';
 import { RedisClientType } from 'redis';
 
-class TransactionService {
+export class TransactionService {
   private redis: RedisClientType;
+  private walletService: WalletService;
 
   constructor() {
     this.redis = getRedisClient();
+    this.walletService = new WalletService();
   }
 
   // Initialize transaction with idempotency check
@@ -206,7 +208,7 @@ class TransactionService {
       }
       
       // For wallet funding (e.g., via virtual account)
-      await WalletService.creditWallet(
+      await this.walletService.creditWallet(
         wallet._id,
         transaction.amount,
         transaction.description,
@@ -245,7 +247,7 @@ class TransactionService {
       }
       
       // Debit wallet first
-      await WalletService.debitWallet(
+      await this.walletService.debitWallet(
         wallet._id,
         transaction.amount,
         transaction.description,
@@ -304,7 +306,7 @@ class TransactionService {
       }
       
       // Perform transfer
-      await WalletService.transferBetweenWallets(
+      await this.walletService.transferBetweenWalletIds(
         sourceWalletId,
         destinationWalletId,
         transaction.amount,
@@ -386,7 +388,7 @@ class TransactionService {
             }).session(session) as IWallet;
             
             if (wallet) {
-              await WalletService.creditWallet(
+              await this.walletService.creditWallet(
                 wallet._id,
                 updatedTransaction.amount,
                 updatedTransaction.description,
@@ -428,38 +430,49 @@ class TransactionService {
   }
 
   // Get transaction by reference
-  async getTransactionByReference(reference: string, tenantId: Types.ObjectId): Promise<ITransaction | null> {
+  async getTransactionByReference(reference: string, tenantId: Types.ObjectId, userId?: Types.ObjectId): Promise<ITransaction | null> {
     const cacheKey = `transaction:${tenantId}:${reference}`;
     
     try {
       const cached = await this.redis.get(cacheKey);
       if (cached) {
-        return JSON.parse(cached);
+        const transaction = JSON.parse(cached);
+        // Check ownership if userId provided
+        if (userId && transaction.user?.toString() !== userId.toString()) {
+          throw new AppError('Access denied', 403);
+        }
+        return transaction;
       }
     } catch (error) {
       logger.warn('Redis cache read failed:', error);
     }
     
-    const transaction = await Transaction.findOne({ reference, tenant: tenantId })
+    const query: any = { reference, tenant: tenantId };
+    if (userId) {
+      query.user = userId;
+    }
+    
+    const transaction = await Transaction.findOne(query)
       .populate('user', 'firstName lastName email')
       .populate('sourceWallet destinationWallet') as ITransaction;
     
-    if (transaction) {
-      // Cache for 5 minutes
-      try {
-        await this.redis.setEx(cacheKey, 300, JSON.stringify(transaction));
-      } catch (error) {
-        logger.warn('Redis cache write failed:', error);
-      }
+    if (!transaction) {
+      throw new AppError('Transaction not found', 404);
+    }
+    
+    // Cache for 5 minutes
+    try {
+      await this.redis.setEx(cacheKey, 300, JSON.stringify(transaction));
+    } catch (error) {
+      logger.warn('Redis cache write failed:', error);
     }
     
     return transaction;
   }
 
   // Get paginated transaction history
-  async getTransactionHistory(filters: ITransactionFilters, pagination: IPaginationOptions): Promise<IPaginationResult<ITransaction>> {
-    const { tenantId, userId, status, type, startDate, endDate } = filters;
-    const { page = 1, limit = 20, sort = '-createdAt' } = pagination;
+  async getTransactionHistory(filters: ITransactionFilters & IPaginationOptions): Promise<IPaginationResult<ITransaction>> {
+    const { tenantId, userId, status, type, startDate, endDate, page = 1, limit = 20, sort = '-createdAt' } = filters;
     
     const query: any = { tenant: tenantId };
     
@@ -496,12 +509,55 @@ class TransactionService {
     };
   }
 
+  // Get wallet transactions
+  async getWalletTransactions(walletId: Types.ObjectId, dto: GetWalletTransactionsDto): Promise<IPaginationResult<ITransaction>> {
+    const { page = 1, limit = 20, type } = dto;
+    
+    const query: any = {
+      $or: [
+        { sourceWallet: walletId },
+        { destinationWallet: walletId }
+      ]
+    };
+    
+    if (type) {
+      query.type = type;
+    }
+    
+    const skip = (page - 1) * limit;
+    
+    const [transactions, total] = await Promise.all([
+      Transaction.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean() as Promise<ITransaction[]>,
+      Transaction.countDocuments(query)
+    ]);
+    
+    return {
+      data: transactions,
+      pagination: {
+        current: page,
+        pages: Math.ceil(total / limit),
+        total,
+        hasNext: page * limit < total,
+        hasPrev: page > 1
+      }
+    };
+  }
+
   // Retry failed transactions
-  async retryFailedTransaction(transactionId: string): Promise<ITransaction> {
+  async retryFailedTransaction(transactionId: string, userId?: Types.ObjectId): Promise<ITransaction> {
     const transaction = await Transaction.findById(transactionId) as ITransaction;
     
     if (!transaction) {
       throw new AppError('Transaction not found', 404);
+    }
+    
+    // Check ownership if userId provided
+    if (userId && transaction.user?._id.toString() !== userId.toString()) {
+      throw new AppError('Access denied', 403);
     }
     
     if (transaction.status !== 'failed') {
@@ -522,6 +578,66 @@ class TransactionService {
     return transaction;
   }
 
+  // Get transaction statistics
+  async getTransactionStats(userId: Types.ObjectId, tenantId: Types.ObjectId, period: string = 'month') {
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate: Date;
+
+    switch (period) {
+      case 'today':
+        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'month':
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+      case 'year':
+        startDate = new Date(now.getFullYear(), 0, 1);
+        break;
+      default:
+        startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const stats = await Transaction.aggregate([
+      {
+        $match: {
+          user: userId,
+          tenant: tenantId,
+          createdAt: { $gte: startDate }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            status: '$status',
+            type: '$type'
+          },
+          count: { $sum: 1 },
+          totalAmount: { $sum: '$amount' }
+        }
+      },
+      {
+        $group: {
+          _id: '$_id.status',
+          types: {
+            $push: {
+              type: '$_id.type',
+              count: '$count',
+              totalAmount: '$totalAmount'
+            }
+          },
+          totalCount: { $sum: '$count' },
+          totalAmount: { $sum: '$totalAmount' }
+        }
+      }
+    ]);
+
+    return stats;
+  }
+
   // Validate transaction (placeholder for additional validation logic)
   async validateTransaction(transactionId: string): Promise<void> {
     const transaction = await Transaction.findById(transactionId) as ITransaction;
@@ -534,5 +650,3 @@ class TransactionService {
     logger.info(`Transaction validated: ${transaction.reference}`);
   }
 }
-
-export default new TransactionService();
