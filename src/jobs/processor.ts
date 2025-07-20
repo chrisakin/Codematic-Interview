@@ -1,5 +1,4 @@
 import { Worker, Job } from 'bullmq';
-import { getRedisClient } from '@/config/redis';
 import logger from '@/config/logger';
 import IORedis from 'ioredis';
 
@@ -41,7 +40,12 @@ let webhookWorker: Worker | undefined;
 let notificationWorker: Worker | undefined;
 
 export function initWorkers() {
-  const connection = new IORedis(); // Defaults to localhost:6379
+  const connection = new IORedis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT || '6379', 10),
+    maxRetriesPerRequest: null,
+    enableReadyCheck: true,
+  });
 
 connection.on('error', (err) => {
     logger.error('Redis connection error:', err);
@@ -81,8 +85,8 @@ connection.on('error', (err) => {
     concurrency: 15,
     maxStalledCount: 2,
     stalledInterval: 30000,
-    removeOnComplete: { count: 50 },
-    removeOnFail: { count: 25 }
+    removeOnComplete: { count: 10 },
+    removeOnFail: { count: 5 }
   });
 
   webhookWorker = new Worker<WebhookJobData>('webhook-notifications', async (job: Job<WebhookJobData>) => {
@@ -128,8 +132,8 @@ connection.on('error', (err) => {
     concurrency: 15,
     maxStalledCount: 2,
     stalledInterval: 30000,
-    removeOnComplete: { count: 50 },
-    removeOnFail: { count: 25 }
+    removeOnComplete: { count: 10 },
+    removeOnFail: { count: 5 }
   });
 
   notificationWorker = new Worker<NotificationJobData>('notifications', async (job: Job<NotificationJobData>) => {
@@ -174,8 +178,8 @@ connection.on('error', (err) => {
     concurrency: 15,
     maxStalledCount: 2,
     stalledInterval: 30000,
-    removeOnComplete: { count: 50 },
-    removeOnFail: { count: 25 }
+    removeOnComplete: { count: 10 },
+    removeOnFail: { count: 5 }
   });
 
   // Worker event handlers
