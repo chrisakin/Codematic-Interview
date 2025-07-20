@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { WebhookService } from '@/services/WebhookService';
+import WebhookService from '@/services/WebhookService';
 import { TransactionService } from '@/services/TransactionService';
 import { catchAsync } from '@/utils/errors';
 import { PaymentProvider } from '@/types';
@@ -66,7 +66,7 @@ export class WebhookController {
     const { transactionId } = req.params;
     const dto = new ReplayWebhookDto(req.body);
     
-    const result = await this.webhookService.replayWebhook(transactionId, dto.event);
+    const result = await this.webhookService.replayWebhook(transactionId as string, dto.event);
 
     res.json({
       status: 'success',
@@ -77,7 +77,7 @@ export class WebhookController {
 
   getWebhookLogs = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
-    const logs = await this.webhookService.getWebhookLogs(transactionId);
+    const logs = await this.webhookService.getWebhookLogs(transactionId as string);
 
     res.json({
       status: 'success',

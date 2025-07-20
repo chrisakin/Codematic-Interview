@@ -1,17 +1,12 @@
-import express from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import { WebhookController } from '@/controllers/WebhookController';
-import { WebhookService } from '@/services/WebhookService';
+import WebhookService from '@/services/WebhookService';
 import { TransactionService } from '@/services/TransactionService';
 import { authenticateWebhook, authenticate } from '@/middleware/auth';
 import { validateDto } from '@/middleware/validation';
 import { ReplayWebhookDto } from '@/dto/webhook.dto';
 
 const router = express.Router();
-
-// Initialize services and controller
-const webhookService = new WebhookService();
-const transactionService = new TransactionService();
-const webhookController = new WebhookController(webhookService, transactionService);
 
 /**
  * @swagger
@@ -22,7 +17,16 @@ const webhookController = new WebhookController(webhookService, transactionServi
  */
 router.post('/paystack', [
   authenticateWebhook
-], webhookController.handlePaystackWebhook);
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const webhookService = new WebhookService();
+    const transactionService = new TransactionService();
+    const webhookController = new WebhookController(webhookService, transactionService);
+    await webhookController.handlePaystackWebhook(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -33,7 +37,16 @@ router.post('/paystack', [
  */
 router.post('/flutterwave', [
   authenticateWebhook
-], webhookController.handleFlutterwaveWebhook);
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const webhookService = new WebhookService();
+    const transactionService = new TransactionService();
+    const webhookController = new WebhookController(webhookService, transactionService);
+    await webhookController.handleFlutterwaveWebhook(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -44,7 +57,16 @@ router.post('/flutterwave', [
  */
 router.post('/stripe', [
   authenticateWebhook
-], webhookController.handleStripeWebhook);
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const webhookService = new WebhookService();
+    const transactionService = new TransactionService();
+    const webhookController = new WebhookController(webhookService, transactionService);
+    await webhookController.handleStripeWebhook(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -56,7 +78,16 @@ router.post('/stripe', [
 router.post('/replay/:transactionId', [
   authenticate,
   validateDto(ReplayWebhookDto)
-], webhookController.replayWebhook);
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const webhookService = new WebhookService();
+    const transactionService = new TransactionService();
+    const webhookController = new WebhookController(webhookService, transactionService);
+    await webhookController.replayWebhook(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -67,7 +98,16 @@ router.post('/replay/:transactionId', [
  */
 router.get('/logs/:transactionId', [
   authenticate
-], webhookController.getWebhookLogs);
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const webhookService = new WebhookService();
+    const transactionService = new TransactionService();
+    const webhookController = new WebhookController(webhookService, transactionService);
+    await webhookController.getWebhookLogs(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -78,6 +118,15 @@ router.get('/logs/:transactionId', [
  */
 router.get('/stats', [
   authenticate
-], webhookController.getWebhookStats);
+], async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const webhookService = new WebhookService();
+    const transactionService = new TransactionService();
+    const webhookController = new WebhookController(webhookService, transactionService);
+    await webhookController.getWebhookStats(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

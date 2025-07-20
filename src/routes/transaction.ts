@@ -14,9 +14,8 @@ const router = express.Router();
 // Apply authentication to all transaction routes
 router.use(authenticate);
 
-// Initialize services and controller
-const transactionService = new TransactionService();
-const transactionController = new TransactionController(transactionService);
+// Do NOT instantiate TransactionService at the top level!
+// Instead, instantiate inside each route handler
 
 /**
  * @swagger
@@ -27,7 +26,15 @@ const transactionController = new TransactionController(transactionService);
  */
 router.post('/', [
   validateDto(InitializeTransactionDto)
-], transactionController.initializeTransaction);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const transactionService = new TransactionService();
+    const transactionController = new TransactionController(transactionService);
+    await transactionController.initializeTransaction(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -38,7 +45,15 @@ router.post('/', [
  */
 router.get('/', [
   validateDto(GetTransactionHistoryDto, 'query')
-], transactionController.getTransactionHistory);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const transactionService = new TransactionService();
+    const transactionController = new TransactionController(transactionService);
+    await transactionController.getTransactionHistory(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -49,7 +64,15 @@ router.get('/', [
  */
 router.get('/stats', [
   validateDto(GetTransactionStatsDto, 'query')
-], transactionController.getTransactionStats);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const transactionService = new TransactionService();
+    const transactionController = new TransactionController(transactionService);
+    await transactionController.getTransactionStats(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -58,7 +81,15 @@ router.get('/stats', [
  *     summary: Get transaction by reference
  *     tags: [Transactions]
  */
-router.get('/:reference', transactionController.getTransactionByReference);
+router.get('/:reference', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const transactionService = new TransactionService();
+    const transactionController = new TransactionController(transactionService);
+    await transactionController.getTransactionByReference(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -70,7 +101,15 @@ router.get('/:reference', transactionController.getTransactionByReference);
 router.post('/:transactionId/retry', [
   requireVerification,
   checkTransactionPermissions
-], transactionController.retryTransaction);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const transactionService = new TransactionService();
+    const transactionController = new TransactionController(transactionService);
+    await transactionController.retryTransaction(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -81,6 +120,14 @@ router.post('/:transactionId/retry', [
  */
 router.post('/process/:transactionId', [
   requireVerification
-], transactionController.processTransaction);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const transactionService = new TransactionService();
+    const transactionController = new TransactionController(transactionService);
+    await transactionController.processTransaction(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

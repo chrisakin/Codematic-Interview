@@ -1,6 +1,6 @@
 import { Schema, model } from 'mongoose';
 import bcrypt from 'bcryptjs';
-import { IUser, IAddress, IKycData } from '@/types';
+import { IUser } from '@/types';
 
 const userSchema = new Schema<IUser>({
   email: {

@@ -1,5 +1,5 @@
 import { Schema, model } from 'mongoose';
-import { ITenant, ITenantSettings, IProviderConfigs } from '@/types';
+import { ITenant } from '@/types';
 
 const tenantSchema = new Schema<ITenant>({
   name: {
@@ -74,9 +74,9 @@ const tenantSchema = new Schema<ITenant>({
 });
 
 // Indexes
-tenantSchema.index({ email: 1 }, { unique: true });
-tenantSchema.index({ apiKey: 1 }, { unique: true });
-tenantSchema.index({ status: 1 });
+// tenantSchema.index({ email: 1 }, { unique: true });
+// tenantSchema.index({ apiKey: 1 }, { unique: true });
+// tenantSchema.index({ status: 1 });
 
 // Virtual for users count
 tenantSchema.virtual('usersCount', {

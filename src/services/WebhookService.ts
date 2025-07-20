@@ -94,7 +94,7 @@ class WebhookService {
         metadata: transaction.metadata,
         createdAt: transaction.createdAt,
         updatedAt: transaction.updatedAt,
-        processedAt: transaction.processedAt
+        ...(transaction.processedAt !== undefined ? { processedAt: transaction.processedAt } : {})
       },
       timestamp: Date.now()
     };
@@ -172,15 +172,17 @@ class WebhookService {
 
   async processIncomingWebhook(provider: string, payload: any, signature: string, tenantId: string): Promise<any> {
     try {
-      const { default: TransactionService } = await import('./TransactionService');
-      
-      // Handle webhook using TransactionService
-      const result = await TransactionService.handleWebhook(
-        provider as any,
-        payload,
-        signature,
-        tenantId
-      );
+   const TransactionServiceModule = await import('./TransactionService');
+const TransactionService = TransactionServiceModule.TransactionService;
+const transactionService = new TransactionService();
+
+// Handle webhook using TransactionService instance
+const result = await transactionService.handleWebhook(
+  provider as any,
+  payload,
+  signature,
+  tenantId
+);
 
       if (result.processed) {
         logger.info(`Incoming webhook processed successfully: ${provider}`, {
@@ -298,4 +300,4 @@ class WebhookService {
   }
 }
 
-export default new WebhookService();
+export default WebhookService;

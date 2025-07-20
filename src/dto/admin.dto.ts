@@ -3,7 +3,7 @@ import { Type } from 'class-transformer';
 
 export class RetryFailedJobsDto {
   @IsIn(['transaction', 'webhook', 'notification'])
-  queue: string;
+  queue!: string;
 
   @IsOptional()
   @IsInt()
@@ -18,7 +18,7 @@ export class RetryFailedJobsDto {
 
 export class CleanQueueDto {
   @IsIn(['transaction', 'webhook', 'notification'])
-  queue: string;
+  queue!: string;
 
   @IsOptional()
   @IsInt()

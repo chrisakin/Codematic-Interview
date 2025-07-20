@@ -214,7 +214,7 @@ class NotificationService {
       error: '#ff0000',     // Red
       success: '#36a64f'    // Green
     };
-    return colors[level] || colors.info;
+    return (colors && colors[level] || colors.info) as string;
   }
 
   // Send transaction notification based on status

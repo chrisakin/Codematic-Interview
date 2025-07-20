@@ -47,6 +47,9 @@ export class TransactionController {
 
   getTransactionByReference = catchAsync(async (req: Request, res: Response) => {
     const { reference } = req.params;
+    if (!reference) {
+      throw new Error('Transaction reference is required');
+    }
     const transaction = await this.transactionService.getTransactionByReference(
       reference,
       req.tenant!._id,
@@ -61,6 +64,9 @@ export class TransactionController {
 
   retryTransaction = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
+    if (!transactionId) {
+      throw new Error('Transaction ID is required');
+    }
     const transaction = await this.transactionService.retryFailedTransaction(
       transactionId,
       req.user!._id
@@ -75,6 +81,9 @@ export class TransactionController {
 
   processTransaction = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
+    if (!transactionId) {
+      throw new Error('Transaction ID is required');
+    }
     const result = await this.transactionService.processTransaction(transactionId);
 
     res.json({

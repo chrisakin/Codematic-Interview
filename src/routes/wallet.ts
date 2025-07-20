@@ -16,11 +16,6 @@ const router = express.Router();
 // Apply authentication to all wallet routes
 router.use(authenticate);
 
-// Initialize services and controller
-const walletService = new WalletService();
-const transactionService = new TransactionService();
-const walletController = new WalletController(walletService, transactionService);
-
 /**
  * @swagger
  * /api/wallets:
@@ -30,7 +25,16 @@ const walletController = new WalletController(walletService, transactionService)
  */
 router.post('/', [
   validateDto(CreateWalletDto)
-], walletController.createWallet);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.createWallet(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -39,7 +43,16 @@ router.post('/', [
  *     summary: Get user wallets
  *     tags: [Wallets]
  */
-router.get('/', walletController.getWallets);
+router.get('/', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.getWallets(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -48,7 +61,16 @@ router.get('/', walletController.getWallets);
  *     summary: Get wallet by currency
  *     tags: [Wallets]
  */
-router.get('/:currency', walletController.getWallet);
+router.get('/:currency', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.getWallet(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -57,7 +79,16 @@ router.get('/:currency', walletController.getWallet);
  *     summary: Get wallet balance
  *     tags: [Wallets]
  */
-router.get('/:currency/balance', walletController.getWalletBalance);
+router.get('/:currency/balance', async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.getWalletBalance(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -68,7 +99,16 @@ router.get('/:currency/balance', walletController.getWalletBalance);
  */
 router.post('/:currency/fund', [
   validateDto(FundWalletDto)
-], walletController.fundWallet);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.fundWallet(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -80,7 +120,16 @@ router.post('/:currency/fund', [
 router.post('/transfer', [
   requireVerification,
   validateDto(TransferBetweenWalletsDto)
-], walletController.transferBetweenWallets);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.transferBetweenWallets(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 /**
  * @swagger
@@ -91,6 +140,15 @@ router.post('/transfer', [
  */
 router.get('/:currency/transactions', [
   validateDto(GetWalletTransactionsDto, 'query')
-], walletController.getWalletTransactions);
+], async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  try {
+    const walletService = new WalletService();
+    const transactionService = new TransactionService();
+    const walletController = new WalletController(walletService, transactionService);
+    await walletController.getWalletTransactions(req, res, next);
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

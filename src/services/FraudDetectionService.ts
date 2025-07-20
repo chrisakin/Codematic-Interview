@@ -456,4 +456,4 @@ class FraudDetectionService {
   }
 }
 
-export default new FraudDetectionService();
+export default FraudDetectionService;

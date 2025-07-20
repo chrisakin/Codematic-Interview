@@ -21,6 +21,8 @@ import walletRoutes from '@/routes/wallet';
 import transactionRoutes from '@/routes/transaction';
 import webhookRoutes from '@/routes/webhook';
 import adminRoutes from '@/routes/admin';
+import { initQueues } from './jobs/queue';
+import { initWorkers } from '@/jobs/processor';
 
 const app: Application = express();
 
@@ -82,7 +84,8 @@ async function startServer(): Promise<void> {
     // Connect to databases
     await connectDB();
     await connectRedis();
-    
+    initQueues();
+    initWorkers()
     // Start background job processor
     await import('@/jobs/processor');
     

@@ -54,7 +54,7 @@ export class TransactionService {
       const reference = Transaction.generateReference();
       
       // Run fraud detection
-      const riskAssessment = await FraudDetectionService.assessTransaction({
+      const riskAssessment = await new FraudDetectionService().assessTransaction({
         tenantId,
         userId,
         amount,

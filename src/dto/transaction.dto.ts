@@ -13,19 +13,19 @@ import { Currency, TransactionType, PaymentMethod, TransactionStatus } from '@/t
 
 export class InitializeTransactionDto {
   @IsIn(['deposit', 'withdrawal', 'transfer'])
-  type: TransactionType;
+  type!: TransactionType;
 
   @IsNumber()
   @Min(1)
   @Transform(({ value }) => parseFloat(value))
-  amount: number;
+  amount!: number;
 
   @IsIn(['NGN', 'USD', 'GBP', 'EUR'])
-  currency: Currency;
+  currency!: Currency;
 
   @IsString()
   @Transform(({ value }) => value?.trim())
-  description: string;
+  description!: string;
 
   @IsOptional()
   @IsIn(['card', 'bank_transfer', 'mobile_money', 'virtual_account', 'wallet'])

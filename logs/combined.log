@@ -1,0 +1,32 @@
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.060Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.065Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.065Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.069Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.069Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.078Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.078Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:49:55.080Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.508Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.513Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.514Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.517Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.517Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.526Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.526Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:50:02.529Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.755Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.759Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.760Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.763Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.763Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.773Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.773Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:54:40.773Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.052Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.056Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.057Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.061Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.061Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.068Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.068Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.068Z"}
