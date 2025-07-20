@@ -189,6 +189,7 @@ transactionSchema.statics.findByReference = function(reference: string, tenant: 
 };
 
 interface ITransactionDocument extends ITransaction {}
-interface ITransactionModelType extends ITransactionModel {}
+interface ITransactionModelType extends mongoose.Model<ITransactionDocument>, ITransactionModel {}
 
-export default model<ITransactionDocument, ITransactionModelType>('Transaction', transactionSchema);
+const TransactionModel = model<ITransactionDocument, ITransactionModelType>('Transaction', transactionSchema);
+export default TransactionModel;

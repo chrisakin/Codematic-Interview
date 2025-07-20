@@ -17,7 +17,8 @@ import {
   IPaginationResult,
   PaymentProvider,
   TransactionStatus,
-  Types
+  Types,
+  PaymentMethod
 } from '@/types';
 import { GetWalletTransactionsDto } from '@/dto/wallet.dto';
 import { RedisClientType } from 'redis';
@@ -59,7 +60,7 @@ export class TransactionService {
         amount,
         currency,
         type,
-        paymentMethod,
+        paymentMethod: paymentMethod as PaymentMethod, // or provide a default value if needed
         metadata
       });
       
@@ -566,7 +567,7 @@ export class TransactionService {
     
     // Reset transaction status
     transaction.status = 'pending';
-    transaction.failedAt = undefined;
+    delete transaction.failedAt;
     await transaction.save();
     
     // Re-queue for processing

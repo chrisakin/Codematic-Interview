@@ -8,7 +8,7 @@ const connectRedis = async (): Promise<RedisClientType> => {
     if (redisClient && redisClient.isOpen) {
       return redisClient;
     }
-    
+
     redisClient = createClient({
       url: process.env.REDIS_URL || 'redis://localhost:6379',
       socket: {
@@ -39,7 +39,7 @@ const connectRedis = async (): Promise<RedisClientType> => {
     });
 
     await redisClient.connect();
-    
+
     return redisClient;
   } catch (error) {
     logger.error('Redis connection failed:', error);
@@ -48,7 +48,7 @@ const connectRedis = async (): Promise<RedisClientType> => {
 };
 
 const getRedisClient = (): RedisClientType => {
-  if (!redisClient) {
+  if (!redisClient || !redisClient.isOpen) {
     throw new Error('Redis client not initialized');
   }
   return redisClient;

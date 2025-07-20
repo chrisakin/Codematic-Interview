@@ -445,3 +445,5 @@ export interface ITransactionStats {
   totalAttempts: number;
   successRate: string;
 }
+
+export { Types };

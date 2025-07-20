@@ -162,7 +162,7 @@ class StripeProvider implements IPaymentProvider {
         const [key, value] = element.split('=');
         if (key === 't') {
           timestamp = value;
-        } else if (key === 'v1') {
+        } else if (key === 'v1' && value !== undefined) {
           signatures.push(value);
         }
       }

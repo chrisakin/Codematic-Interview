@@ -1,6 +1,5 @@
 import User from '@/models/User';
 import Transaction from '@/models/Transaction';
-import Wallet from '@/models/Wallet';
 import { getRedisClient } from '@/config/redis';
 import logger from '@/config/logger';
 import { IFraudCheckData, IRiskAssessment, IUser } from '@/types';
@@ -62,7 +61,7 @@ class FraudDetectionService {
                          flags.includes('STOLEN_CARD') || 
                          flags.includes('BLACKLISTED_IP');
       
-      const reason = shouldBlock ? this.getBlockReason(flags) : undefined;
+      const reason = shouldBlock ? this.getBlockReason(flags) : '';
       
       // Cache risk assessment for future reference
       await this.cacheRiskAssessment(userId, tenantId, {
@@ -88,7 +87,7 @@ class FraudDetectionService {
         score: 50,
         flags: ['FRAUD_CHECK_FAILED'],
         shouldBlock: false,
-        reason: undefined,
+        reason: 'Fraud check failed',
         riskLevel: 'MEDIUM'
       };
     }

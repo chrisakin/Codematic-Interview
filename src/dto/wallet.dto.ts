@@ -4,9 +4,10 @@ import { Currency } from '@/types';
 
 export class CreateWalletDto {
   @IsIn(['NGN', 'USD', 'GBP', 'EUR'])
-  currency: Currency;
+  currency!: Currency;
 
   constructor(data: any) {
+    this.currency = 'NGN'; // Default value
     Object.assign(this, data);
   }
 }
@@ -15,34 +16,40 @@ export class FundWalletDto {
   @IsNumber()
   @Min(1)
   @Transform(({ value }) => parseFloat(value))
-  amount: number;
+  amount!: number;
 
   @IsString()
   @Transform(({ value }) => value?.trim())
-  description: string;
+  description!: string;
 
   constructor(data: any) {
+    this.amount = 0;
+    this.description = '';
     Object.assign(this, data);
   }
 }
 
 export class TransferBetweenWalletsDto {
   @IsIn(['NGN', 'USD', 'GBP', 'EUR'])
-  fromCurrency: Currency;
+  fromCurrency!: Currency;
 
   @IsIn(['NGN', 'USD', 'GBP', 'EUR'])
-  toCurrency: Currency;
+  toCurrency!: Currency;
 
   @IsNumber()
   @Min(1)
   @Transform(({ value }) => parseFloat(value))
-  amount: number;
+  amount!: number;
 
   @IsString()
   @Transform(({ value }) => value?.trim())
-  description: string;
+  description!: string;
 
   constructor(data: any) {
+    this.fromCurrency = 'NGN';
+    this.toCurrency = 'NGN';
+    this.amount = 0;
+    this.description = '';
     Object.assign(this, data);
   }
 }

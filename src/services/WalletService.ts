@@ -94,7 +94,7 @@ export class WalletService {
     return wallet;
   }
 
-  async getUserWallets(userId: Types.ObjectId, tenantId: Types.ObjectId, currency?: Currency): Promise<IWallet[]> {
+  async getUserWallets(userId: Types.ObjectId, tenantId: Types.ObjectId, currency?: Currency): Promise<({ [key: string]: any; formattedBalance: IFormattedBalance })[]> {
     const query: any = {
       user: userId,
       tenant: tenantId
@@ -104,7 +104,7 @@ export class WalletService {
       query.currency = currency;
     }
 
-    const wallets = await Wallet.find(query).lean() as IWallet[];
+    const wallets = await Wallet.find(query).lean();
 
     // Get formatted balances for each wallet
     const walletsWithBalances = await Promise.all(
@@ -482,7 +482,10 @@ export class WalletService {
             return 0
           end
         `;
-        await this.redis.eval(script, 1, [lockKey], [this.lockValue]);
+        await this.redis.eval(script, {
+          keys: [lockKey],
+          arguments: [this.lockValue]
+        });
         this.lockValue = null;
       }
     } catch (error) {
