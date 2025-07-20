@@ -95,6 +95,113 @@ export class WalletService {
   }
 
   async getUserWallets(userId: Types.ObjectId, tenantId: Types.ObjectId, currency?: Currency): Promise<({ [key: string]: any; formattedBalance: IFormattedBalance })[]> {
+    try {
+      const matchStage: any = {
+        user: userId,
+        tenant: tenantId
+      };
+
+      if (currency) {
+        matchStage.currency = currency;
+      }
+
+      const pipeline: any = [
+        { $match: matchStage },
+        {
+          $lookup: {
+            from: 'transactions',
+            let: { walletId: '$_id' },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $and: [
+                      {
+                        $or: [
+                          { $eq: ['$sourceWallet', '$$walletId'] },
+                          { $eq: ['$destinationWallet', '$$walletId'] }
+                        ]
+                      },
+                      { $eq: ['$status', 'completed'] }
+                    ]
+                  }
+                }
+              },
+              { $sort: { createdAt: -1 } },
+              { $limit: 5 } // Get last 5 transactions for each wallet
+            ],
+            as: 'recentTransactions'
+          }
+        },
+        {
+          $addFields: {
+            formattedBalance: {
+              balance: { $divide: ['$balance', 100] },
+              ledgerBalance: { $divide: ['$ledgerBalance', 100] },
+              currency: '$currency'
+            },
+            transactionCount: { $size: '$recentTransactions' },
+            lastTransactionDate: {
+              $cond: {
+                if: { $gt: [{ $size: '$recentTransactions' }, 0] },
+                then: { $arrayElemAt: ['$recentTransactions.createdAt', 0] },
+                else: null
+              }
+            }
+          }
+        },
+        {
+          $project: {
+            _id: 1,
+            user: 1,
+            tenant: 1,
+            currency: 1,
+            balance: 1,
+            ledgerBalance: 1,
+            status: 1,
+            limits: 1,
+            virtualAccounts: 1,
+            lastTransactionAt: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            formattedBalance: 1,
+            transactionCount: 1,
+            lastTransactionDate: 1,
+            recentTransactions: {
+              $map: {
+                input: '$recentTransactions',
+                as: 'txn',
+                in: {
+                  _id: '$$txn._id',
+                  reference: '$$txn.reference',
+                  type: '$$txn.type',
+                  amount: '$$txn.amount',
+                  description: '$$txn.description',
+                  createdAt: '$$txn.createdAt'
+                }
+              }
+            }
+          }
+        }
+      ];
+
+      const walletsWithBalances = await Wallet.aggregate(pipeline);
+      
+      // Cache the results for each wallet
+      for (const wallet of walletsWithBalances) {
+        await this.cacheWallet(wallet as any, 300);
+      }
+
+      return walletsWithBalances;
+    } catch (error) {
+      logger.error('Failed to get user wallets with aggregation:', error);
+      // Fallback to the original method if aggregation fails
+      return this.getUserWalletsLegacy(userId, tenantId, currency);
+    }
+  }
+
+  // Keep the original method as a fallback
+  private async getUserWalletsLegacy(userId: Types.ObjectId, tenantId: Types.ObjectId, currency?: Currency): Promise<({ [key: string]: any; formattedBalance: IFormattedBalance })[]> {
     const query: any = {
       user: userId,
       tenant: tenantId

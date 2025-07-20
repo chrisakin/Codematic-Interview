@@ -30,3 +30,43 @@ export class CleanQueueDto {
     Object.assign(this, data);
   }
 }
+
+export class GetTopUsersDto {
+  @IsOptional()
+  @IsIn(['today', 'week', 'month', 'year'])
+  period?: string = 'month';
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Type(() => Number)
+  limit?: number = 10;
+
+  constructor(data: any) {
+    Object.assign(this, data);
+  }
+}
+
+export class GetTransactionTrendsDto {
+  @IsOptional()
+  @IsIn(['week', 'month', 'year'])
+  period?: string = 'month';
+
+  @IsOptional()
+  @IsIn(['hour', 'day', 'month'])
+  groupBy?: string = 'day';
+
+  constructor(data: any) {
+    Object.assign(this, data);
+  }
+}
+
+export class GetFraudAnalyticsDto {
+  @IsOptional()
+  @IsIn(['week', 'month', 'year'])
+  period?: string = 'month';
+
+  constructor(data: any) {
+    Object.assign(this, data);
+  }
+}

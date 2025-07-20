@@ -70,6 +70,10 @@ walletSchema.index({ user: 1, tenant: 1, currency: 1 }, { unique: true });
 walletSchema.index({ tenant: 1, status: 1 });
 walletSchema.index({ tenant: 1, currency: 1 });
 walletSchema.index({ user: 1 });
+// Additional indexes for aggregation performance
+walletSchema.index({ tenant: 1, createdAt: -1 });
+walletSchema.index({ balance: -1, tenant: 1 });
+walletSchema.index({ status: 1, currency: 1, tenant: 1 });
 
 // Middleware to update version on save
 walletSchema.pre('save', function(this: IWallet, next) {

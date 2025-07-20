@@ -46,3 +46,75 @@
 {"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.627Z"}
 {"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.629Z"}
 {"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.631Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.086Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.091Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.092Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.095Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.095Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.102Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.102Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:53:54.104Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.947Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.951Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.952Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.955Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.956Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.964Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.964Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:54:19.964Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.326Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.331Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.332Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.336Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.336Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.343Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.343Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:55:28.345Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.701Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.705Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.707Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.709Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.710Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.717Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.719Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:56:01.719Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.931Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.935Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.936Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.940Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.940Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.947Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.949Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:56:15.950Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.357Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.361Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.363Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.366Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.366Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.373Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.375Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:56:41.377Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.037Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.041Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.042Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.045Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.045Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.053Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.054Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:57:15.055Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.779Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.784Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.785Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.788Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.788Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.795Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.795Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:57:35.795Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.041Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.046Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.047Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.050Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.050Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.060Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.060Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:57:55.060Z"}

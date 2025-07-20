@@ -3,7 +3,13 @@ import { AdminController } from '@/controllers/AdminController';
 import { AdminService } from '@/services/AdminService';
 import { authenticate, authorize } from '@/middleware/auth';
 import { validateDto } from '@/middleware/validation';
-import { RetryFailedJobsDto, CleanQueueDto } from '@/dto/admin.dto';
+import { 
+  RetryFailedJobsDto, 
+  CleanQueueDto, 
+  GetTopUsersDto, 
+  GetTransactionTrendsDto, 
+  GetFraudAnalyticsDto 
+} from '@/dto/admin.dto';
 
 const router = express.Router();
 
@@ -54,5 +60,47 @@ router.post('/retry-failed-jobs', [
 router.post('/clean-queue', [
   validateDto(CleanQueueDto, 'query')
 ], adminController.cleanQueue);
+
+/**
+ * @swagger
+ * /api/admin/top-users:
+ *   get:
+ *     summary: Get top transacting users
+ *     tags: [Admin]
+ */
+router.get('/top-users', [
+  validateDto(GetTopUsersDto, 'query')
+], adminController.getTopTransactingUsers);
+
+/**
+ * @swagger
+ * /api/admin/transaction-trends:
+ *   get:
+ *     summary: Get transaction trends over time
+ *     tags: [Admin]
+ */
+router.get('/transaction-trends', [
+  validateDto(GetTransactionTrendsDto, 'query')
+], adminController.getTransactionTrends);
+
+/**
+ * @swagger
+ * /api/admin/wallet-summary:
+ *   get:
+ *     summary: Get wallet summary by currency and status
+ *     tags: [Admin]
+ */
+router.get('/wallet-summary', adminController.getWalletSummary);
+
+/**
+ * @swagger
+ * /api/admin/fraud-analytics:
+ *   get:
+ *     summary: Get fraud detection analytics
+ *     tags: [Admin]
+ */
+router.get('/fraud-analytics', [
+  validateDto(GetFraudAnalyticsDto, 'query')
+], adminController.getFraudAnalytics);
 
 export default router;

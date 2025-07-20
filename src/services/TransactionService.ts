@@ -581,7 +581,152 @@ export class TransactionService {
 
   // Get transaction statistics
   async getTransactionStats(userId: Types.ObjectId, tenantId: Types.ObjectId, period: string = 'month') {
-    // Calculate date range based on period
+    try {
+      // Calculate date range based on period
+      const now = new Date();
+      let startDate: Date;
+
+      switch (period) {
+        case 'today':
+          startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+          break;
+        case 'week':
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+
+      const pipeline: any = [
+        {
+          $match: {
+            user: userId,
+            tenant: tenantId,
+            createdAt: { $gte: startDate }
+          }
+        },
+        {
+          $facet: {
+            statusBreakdown: [
+              {
+                $group: {
+                  _id: '$status',
+                  count: { $sum: 1 },
+                  totalAmount: { $sum: '$amount' },
+                  avgAmount: { $avg: '$amount' }
+                }
+              }
+            ],
+            typeBreakdown: [
+              {
+                $group: {
+                  _id: '$type',
+                  count: { $sum: 1 },
+                  totalAmount: { $sum: '$amount' },
+                  avgAmount: { $avg: '$amount' }
+                }
+              }
+            ],
+            currencyBreakdown: [
+              {
+                $group: {
+                  _id: '$currency',
+                  count: { $sum: 1 },
+                  totalAmount: { $sum: '$amount' },
+                  avgAmount: { $avg: '$amount' }
+                }
+              }
+            ],
+            dailyVolume: [
+              {
+                $group: {
+                  _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                  count: { $sum: 1 },
+                  totalAmount: { $sum: '$amount' }
+                }
+              },
+              { $sort: { _id: 1 } }
+            ],
+            summary: [
+              {
+                $group: {
+                  _id: null,
+                  totalTransactions: { $sum: 1 },
+                  totalAmount: { $sum: '$amount' },
+                  avgTransactionAmount: { $avg: '$amount' },
+                  successfulTransactions: {
+                    $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+                  },
+                  failedTransactions: {
+                    $sum: { $cond: [{ $eq: ['$status', 'failed'] }, 1, 0] }
+                  }
+                }
+              },
+              {
+                $project: {
+                  _id: 0,
+                  totalTransactions: 1,
+                  totalAmount: { $divide: ['$totalAmount', 100] },
+                  avgTransactionAmount: { $divide: ['$avgTransactionAmount', 100] },
+                  successfulTransactions: 1,
+                  failedTransactions: 1,
+                  successRate: {
+                    $cond: {
+                      if: { $gt: ['$totalTransactions', 0] },
+                      then: { 
+                        $multiply: [
+                          { $divide: ['$successfulTransactions', '$totalTransactions'] }, 
+                          100
+                        ] 
+                      },
+                      else: 0
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ];
+
+      const result = await Transaction.aggregate(pipeline);
+      const stats = result[0];
+
+      // Format the amounts in breakdown sections
+      ['statusBreakdown', 'typeBreakdown', 'currencyBreakdown'].forEach(section => {
+        if (stats[section]) {
+          stats[section] = stats[section].map((item: any) => ({
+            ...item,
+            totalAmount: item.totalAmount / 100,
+            avgAmount: item.avgAmount / 100
+          }));
+        }
+      });
+
+      if (stats.dailyVolume) {
+        stats.dailyVolume = stats.dailyVolume.map((item: any) => ({
+          ...item,
+          totalAmount: item.totalAmount / 100
+        }));
+      }
+
+      logger.info(`Retrieved enhanced transaction stats for user ${userId}, period: ${period}`);
+      return stats;
+    } catch (error) {
+      logger.error('Failed to get transaction stats:', error);
+      // Fallback to simpler aggregation
+      return this.getTransactionStatsLegacy(userId, tenantId, period);
+    }
+  }
+
+  // Legacy method as fallback
+  private async getTransactionStatsLegacy(userId: Types.ObjectId, tenantId: Types.ObjectId, period: string = 'month') {
     const now = new Date();
     let startDate: Date;
 

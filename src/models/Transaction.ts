@@ -135,6 +135,13 @@ transactionSchema.index({ providerReference: 1, provider: 1 });
 transactionSchema.index({ idempotencyKey: 1, tenant: 1 }, { unique: true, sparse: true });
 transactionSchema.index({ webhookStatus: 1, webhookAttempts: 1 });
 transactionSchema.index({ status: 1, createdAt: 1 });
+// Additional indexes for aggregation performance
+transactionSchema.index({ tenant: 1, user: 1, status: 1, createdAt: -1 });
+transactionSchema.index({ tenant: 1, status: 1, type: 1, createdAt: -1 });
+transactionSchema.index({ riskScore: 1, tenant: 1, createdAt: -1 });
+transactionSchema.index({ fraudFlags: 1, tenant: 1 });
+transactionSchema.index({ sourceWallet: 1, createdAt: -1 });
+transactionSchema.index({ destinationWallet: 1, createdAt: -1 });
 
 // Virtual for formatted amount
 transactionSchema.virtual('formattedAmount').get(function(this: ITransaction): IFormattedAmount {
