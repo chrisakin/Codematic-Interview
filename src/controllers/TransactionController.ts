@@ -1,7 +1,7 @@
 import { Response } from 'express';
+import { Request } from 'express';
 import { TransactionService } from '@/services/TransactionService';
 import { catchAsync } from '@/utils/errors';
-import { IAuthenticatedRequest } from '@/types';
 import { 
   InitializeTransactionDto, 
   GetTransactionHistoryDto,
@@ -11,12 +11,12 @@ import {
 export class TransactionController {
   constructor(private transactionService: TransactionService) {}
 
-  initializeTransaction = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  initializeTransaction = catchAsync(async (req: Request, res: Response) => {
     const dto = new InitializeTransactionDto(req.body);
     const transaction = await this.transactionService.initializeTransaction({
       ...dto,
-      tenantId: req.tenant._id,
-      userId: req.user._id,
+      tenantId: req.tenant!._id,
+      userId: req.user!._id,
       metadata: {
         ...dto.metadata,
         clientIp: req.ip,
@@ -31,12 +31,12 @@ export class TransactionController {
     });
   });
 
-  getTransactionHistory = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getTransactionHistory = catchAsync(async (req: Request, res: Response) => {
     const dto = new GetTransactionHistoryDto(req.query);
     const result = await this.transactionService.getTransactionHistory({
       ...dto,
-      tenantId: req.tenant._id,
-      userId: req.user._id
+      tenantId: req.tenant!._id,
+      userId: req.user!._id
     });
 
     res.json({
@@ -45,12 +45,12 @@ export class TransactionController {
     });
   });
 
-  getTransactionByReference = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getTransactionByReference = catchAsync(async (req: Request, res: Response) => {
     const { reference } = req.params;
     const transaction = await this.transactionService.getTransactionByReference(
       reference,
-      req.tenant._id,
-      req.user._id
+      req.tenant!._id,
+      req.user!._id
     );
 
     res.json({
@@ -59,11 +59,11 @@ export class TransactionController {
     });
   });
 
-  retryTransaction = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  retryTransaction = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
     const transaction = await this.transactionService.retryFailedTransaction(
       transactionId,
-      req.user._id
+      req.user!._id
     );
 
     res.json({
@@ -73,7 +73,7 @@ export class TransactionController {
     });
   });
 
-  processTransaction = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  processTransaction = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
     const result = await this.transactionService.processTransaction(transactionId);
 
@@ -84,11 +84,11 @@ export class TransactionController {
     });
   });
 
-  getTransactionStats = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getTransactionStats = catchAsync(async (req: Request, res: Response) => {
     const dto = new GetTransactionStatsDto(req.query);
     const stats = await this.transactionService.getTransactionStats(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       dto.period
     );
 

@@ -1,8 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from '@/services/AuthService';
 import { TenantService } from '@/services/TenantService';
-import { catchAsync } from '@/utils/errors';
-import { IAuthenticatedRequest } from '@/types';
 import { 
   RegisterUserDto, 
   LoginUserDto, 
@@ -10,6 +8,7 @@ import {
   RegisterTenantDto,
   VerifyTokenDto 
 } from '@/dto/auth.dto';
+import { catchAsync } from '@/utils/errors';
 
 export class AuthController {
   constructor(
@@ -39,19 +38,19 @@ export class AuthController {
     });
   });
 
-  getProfile = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getProfile = catchAsync(async (req: Request, res: Response) => {
     res.json({
       status: 'success',
       data: {
-        user: req.user.toSafeJSON(),
-        tenant: req.tenant.toSafeJSON()
+        user: req.user!.toSafeJSON(),
+        tenant: req.tenant!.toSafeJSON()
       }
     });
   });
 
-  changePassword = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  changePassword = catchAsync(async (req: Request, res: Response) => {
     const dto = new ChangePasswordDto(req.body);
-    await this.authService.changePassword(req.user._id, dto);
+    await this.authService.changePassword(req.user!._id, dto);
 
     res.json({
       status: 'success',

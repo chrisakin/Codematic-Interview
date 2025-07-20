@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { WebhookService } from '@/services/WebhookService';
 import { TransactionService } from '@/services/TransactionService';
 import { catchAsync } from '@/utils/errors';
-import { IAuthenticatedRequest, PaymentProvider } from '@/types';
+import { PaymentProvider } from '@/types';
 import { ReplayWebhookDto } from '@/dto/webhook.dto';
 
 export class WebhookController {
@@ -13,7 +13,7 @@ export class WebhookController {
 
   handlePaystackWebhook = catchAsync(async (req: Request, res: Response) => {
     const { tenant_id } = req.query;
-    const signature = req.headers['x-paystack-signature'] as string;
+    const signature = req.webhookSignature!;
     
     const result = await this.transactionService.handleWebhook(
       'paystack',
@@ -30,7 +30,7 @@ export class WebhookController {
 
   handleFlutterwaveWebhook = catchAsync(async (req: Request, res: Response) => {
     const { tenant_id } = req.query;
-    const signature = req.headers['verif-hash'] as string;
+    const signature = req.webhookSignature!;
     
     const result = await this.transactionService.handleWebhook(
       'flutterwave',
@@ -47,7 +47,7 @@ export class WebhookController {
 
   handleStripeWebhook = catchAsync(async (req: Request, res: Response) => {
     const { tenant_id } = req.query;
-    const signature = req.headers['stripe-signature'] as string;
+    const signature = req.webhookSignature!;
     
     const result = await this.transactionService.handleWebhook(
       'stripe',
@@ -62,7 +62,7 @@ export class WebhookController {
     });
   });
 
-  replayWebhook = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  replayWebhook = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
     const dto = new ReplayWebhookDto(req.body);
     
@@ -75,7 +75,7 @@ export class WebhookController {
     });
   });
 
-  getWebhookLogs = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getWebhookLogs = catchAsync(async (req: Request, res: Response) => {
     const { transactionId } = req.params;
     const logs = await this.webhookService.getWebhookLogs(transactionId);
 
@@ -85,10 +85,10 @@ export class WebhookController {
     });
   });
 
-  getWebhookStats = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getWebhookStats = catchAsync(async (req: Request, res: Response) => {
     const { startDate, endDate } = req.query;
     const stats = await this.webhookService.getWebhookStats(
-      req.tenant._id,
+      req.tenant!._id,
       startDate as string,
       endDate as string
     );

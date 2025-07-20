@@ -5,7 +5,20 @@ import Tenant from '@/models/Tenant';
 import Transaction from '@/models/Transaction';
 import { AppError } from '@/utils/errors';
 import logger from '@/config/logger';
-import { IAuthenticatedRequest, IUser, ITenant, ITransaction } from '@/types';
+import { IUser, ITenant, ITransaction } from '@/types';
+
+// Extend Express Request interface
+declare global {
+  namespace Express {
+    interface Request {
+      user?: IUser;
+      tenant?: ITenant;
+      transaction?: ITransaction;
+      webhookSignature?: string;
+      webhookTimestamp?: string;
+    }
+  }
+}
 
 interface JWTPayload {
   userId: string;
@@ -15,7 +28,7 @@ interface JWTPayload {
 }
 
 // Verify JWT token and attach user to request
-export const authenticate = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+export const authenticate = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -68,7 +81,7 @@ export const authenticate = async (req: IAuthenticatedRequest, res: Response, ne
 };
 
 // Verify API key for webhook endpoints
-export const authenticateApiKey = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+export const authenticateApiKey = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const apiKey = req.headers['x-api-key'] as string || req.query.api_key as string;
     
@@ -95,7 +108,7 @@ export const authenticateApiKey = async (req: IAuthenticatedRequest, res: Respon
 };
 
 // Verify webhook signature
-export const authenticateWebhook = (req: IAuthenticatedRequest, res: Response, next: NextFunction): void => {
+export const authenticateWebhook = (req: Request, res: Response, next: NextFunction): void => {
   try {
     const signature = req.headers['x-webhook-signature'] as string || req.headers['x-paystack-signature'] as string;
     const timestamp = req.headers['x-webhook-timestamp'] as string;
@@ -117,7 +130,7 @@ export const authenticateWebhook = (req: IAuthenticatedRequest, res: Response, n
 
 // Authorization middleware
 export const authorize = (...roles: string[]) => {
-  return (req: IAuthenticatedRequest, res: Response, next: NextFunction): void => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
       return next(new AppError('Authentication required', 401));
     }
@@ -133,7 +146,7 @@ export const authorize = (...roles: string[]) => {
 };
 
 // Check if user is verified (KYC)
-export const requireVerification = (req: IAuthenticatedRequest, res: Response, next: NextFunction): void => {
+export const requireVerification = (req: Request, res: Response, next: NextFunction): void => {
   if (!req.user) {
     return next(new AppError('Authentication required', 401));
   }
@@ -146,7 +159,7 @@ export const requireVerification = (req: IAuthenticatedRequest, res: Response, n
 };
 
 // Optional authentication - doesn't fail if no token
-export const optionalAuth = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+export const optionalAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
     
@@ -176,7 +189,7 @@ export const optionalAuth = async (req: IAuthenticatedRequest, res: Response, ne
 };
 
 // Check transaction permissions
-export const checkTransactionPermissions = async (req: IAuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
+export const checkTransactionPermissions = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { transactionId } = req.params;
     
@@ -191,13 +204,13 @@ export const checkTransactionPermissions = async (req: IAuthenticatedRequest, re
     }
     
     // Check if user owns the transaction or is admin
-    if (transaction.user?.toString() !== req.user._id.toString() && 
+    if (transaction.user?.toString() !== req.user!._id.toString() && 
         (req.user as any).role !== 'admin') {
       return next(new AppError('Access denied', 403));
     }
     
     // Check if transaction belongs to user's tenant
-    if (transaction.tenant.toString() !== req.tenant._id.toString()) {
+    if (transaction.tenant.toString() !== req.tenant!._id.toString()) {
       return next(new AppError('Access denied', 403));
     }
     

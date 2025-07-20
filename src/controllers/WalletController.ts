@@ -1,8 +1,9 @@
 import { Response } from 'express';
+import { Request } from 'express';
 import { WalletService } from '@/services/WalletService';
 import { TransactionService } from '@/services/TransactionService';
 import { catchAsync } from '@/utils/errors';
-import { IAuthenticatedRequest, Currency } from '@/types';
+import { Currency } from '@/types';
 import { 
   CreateWalletDto, 
   FundWalletDto, 
@@ -16,11 +17,11 @@ export class WalletController {
     private transactionService: TransactionService
   ) {}
 
-  createWallet = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  createWallet = catchAsync(async (req: Request, res: Response) => {
     const dto = new CreateWalletDto(req.body);
     const wallet = await this.walletService.createWallet(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       dto.currency
     );
 
@@ -31,11 +32,11 @@ export class WalletController {
     });
   });
 
-  getWallets = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getWallets = catchAsync(async (req: Request, res: Response) => {
     const { currency } = req.query;
     const wallets = await this.walletService.getUserWallets(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       currency as Currency
     );
 
@@ -48,11 +49,11 @@ export class WalletController {
     });
   });
 
-  getWallet = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getWallet = catchAsync(async (req: Request, res: Response) => {
     const { currency } = req.params;
     const wallet = await this.walletService.getWallet(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       currency as Currency
     );
 
@@ -69,11 +70,11 @@ export class WalletController {
     });
   });
 
-  getWalletBalance = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getWalletBalance = catchAsync(async (req: Request, res: Response) => {
     const { currency } = req.params;
     const wallet = await this.walletService.getWallet(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       currency as Currency
     );
 
@@ -85,13 +86,13 @@ export class WalletController {
     });
   });
 
-  fundWallet = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  fundWallet = catchAsync(async (req: Request, res: Response) => {
     const { currency } = req.params;
     const dto = new FundWalletDto(req.body);
 
     const wallet = await this.walletService.getWallet(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       currency as Currency
     );
 
@@ -104,11 +105,11 @@ export class WalletController {
     });
   });
 
-  transferBetweenWallets = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  transferBetweenWallets = catchAsync(async (req: Request, res: Response) => {
     const dto = new TransferBetweenWalletsDto(req.body);
     const result = await this.walletService.transferBetweenWallets(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       dto
     );
 
@@ -119,13 +120,13 @@ export class WalletController {
     });
   });
 
-  getWalletTransactions = catchAsync(async (req: IAuthenticatedRequest, res: Response) => {
+  getWalletTransactions = catchAsync(async (req: Request, res: Response) => {
     const { currency } = req.params;
     const dto = new GetWalletTransactionsDto(req.query);
 
     const wallet = await this.walletService.getWallet(
-      req.user._id,
-      req.tenant._id,
+      req.user!._id,
+      req.tenant!._id,
       currency as Currency
     );
 

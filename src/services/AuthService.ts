@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { SignOptions } from 'jsonwebtoken';
 import { Types } from 'mongoose';
 import User from '@/models/User';
 import Tenant from '@/models/Tenant';
@@ -126,13 +126,13 @@ export class AuthService {
         throw new AppError('User no longer exists', 401);
       }
 
-      if (user.status !== 'active' || !user.tenant.isActive()) {
+      if (user.status !== 'active' || (!user.tenant as unknown as ITenant).isActive()) {
         throw new AppError('Account is not active', 401);
       }
 
       return {
         user: user.toSafeJSON(),
-        tenant: user.tenant.toSafeJSON(),
+        tenant: (user.tenant as unknown as ITenant).toSafeJSON(),
         expiresAt: new Date(decoded.exp * 1000)
       };
     } catch (error: any) {
@@ -146,11 +146,29 @@ export class AuthService {
     }
   }
 
-  private generateToken(userId: Types.ObjectId, tenantId: Types.ObjectId): string {
-    return jwt.sign(
-      { userId, tenantId },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
-    );
+private generateToken(userId: Types.ObjectId, tenantId: Types.ObjectId): string {
+  const secret = process.env.JWT_SECRET;
+  const rawExpiresIn = process.env.JWT_EXPIRES_IN;
+
+  if (!secret) {
+    throw new Error('JWT_SECRET is not defined');
   }
+
+  // Strict literal type enforcement for expiresIn
+  const expiresIn: SignOptions['expiresIn'] =
+    (rawExpiresIn as SignOptions['expiresIn']) || '7d';
+
+  const payload = {
+    userId: userId.toHexString(),
+    tenantId: tenantId.toHexString(),
+  };
+
+  // Pass options only if expiresIn is defined
+  const options: SignOptions = {
+    expiresIn, // now always defined and strictly typed
+  };
+
+  return jwt.sign(payload, secret, options);
+}
+
 }

@@ -3,7 +3,7 @@ import { Transform } from 'class-transformer';
 
 export class RegisterUserDto {
   @IsEmail()
-  @Transform(({ value }) => value?.toLowerCase().trim())
+  @Transform(({ value }: any) => value?.toLowerCase().trim())
   email: string;
 
   @IsString()
@@ -26,13 +26,18 @@ export class RegisterUserDto {
   tenantId: string;
 
   constructor(data: any) {
+    this.email = '';
+    this.password = '';
+    this.firstName = '';
+    this.lastName = '';
+    this.tenantId = '';
     Object.assign(this, data);
   }
 }
 
 export class LoginUserDto {
   @IsEmail()
-  @Transform(({ value }) => value?.toLowerCase().trim())
+  @Transform(({ value }: any) => value?.toLowerCase().trim())
   email: string;
 
   @IsString()
@@ -42,6 +47,9 @@ export class LoginUserDto {
   tenantId: string;
 
   constructor(data: any) {
+    this.email = '';
+    this.password = '';
+    this.tenantId = '';
     Object.assign(this, data);
   }
 }
@@ -55,6 +63,8 @@ export class ChangePasswordDto {
   newPassword: string;
 
   constructor(data: any) {
+    this.currentPassword = '';
+    this.newPassword = '';
     Object.assign(this, data);
   }
 }
@@ -64,6 +74,7 @@ export class VerifyTokenDto {
   token: string;
 
   constructor(data: any) {
+    this.token = '';
     Object.assign(this, data);
   }
 }
@@ -74,13 +85,16 @@ export class RegisterTenantDto {
   name: string;
 
   @IsEmail()
-  @Transform(({ value }) => value?.toLowerCase().trim())
+  @Transform(({ value }: any) => value?.toLowerCase().trim())
   email: string;
 
   @IsIn(['ecommerce', 'fintech', 'marketplace', 'saas'])
   businessType: string;
 
   constructor(data: any) {
+    this.name = '';
+    this.email = '';
+    this.businessType = '';
     Object.assign(this, data);
   }
 }

@@ -1,5 +1,4 @@
 import { Document, Types } from 'mongoose';
-import { Request } from 'express';
 
 // Base types
 export type Currency = 'NGN' | 'USD' | 'GBP' | 'EUR';
@@ -30,16 +29,16 @@ export interface IUser extends Document {
   password: string;
   firstName: string;
   lastName: string;
-  phoneNumber?: string;
-  dateOfBirth?: Date;
-  address?: IAddress;
+  phoneNumber?: string | undefined;
+  dateOfBirth?: Date | undefined;
+  address?: IAddress | undefined;
   tenant: Types.ObjectId | ITenant;
   status: 'active' | 'suspended' | 'pending';
   kycStatus: 'pending' | 'verified' | 'rejected';
-  kycData?: IKycData;
-  lastLoginAt?: Date;
+  kycData?: IKycData | undefined;
+  lastLoginAt?: Date | undefined;
   loginAttempts: number;
-  lockUntil?: Date;
+  lockUntil?: Date | undefined;
   createdAt: Date;
   updatedAt: Date;
   __v: number;
@@ -211,15 +210,6 @@ export interface ITransaction extends Document {
 export interface ITransactionModel {
   generateReference(prefix?: string): string;
   findByReference(reference: string, tenant: Types.ObjectId): Promise<ITransaction | null>;
-}
-
-// Request interfaces
-export interface IAuthenticatedRequest extends Request {
-  user: IUser;
-  tenant: ITenant;
-  transaction?: ITransaction;
-  webhookSignature?: string;
-  webhookTimestamp?: string;
 }
 
 // Service interfaces
