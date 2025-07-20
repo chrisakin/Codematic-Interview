@@ -30,3 +30,19 @@
 {"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.068Z"}
 {"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.068Z"}
 {"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T01:57:01.068Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.217Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.221Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.223Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.226Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.226Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.235Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.236Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:27:23.238Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.611Z"}
+{"level":"info","message":"Connected to Redis","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.615Z"}
+{"level":"info","message":"Redis Client Ready","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.617Z"}
+{"level":"info","message":"Server running on port 3000","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.620Z"}
+{"level":"info","message":"Swagger docs available at http://localhost:3000/api-docs","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.620Z"}
+{"level":"info","message":"Worker ready: transaction-processing","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.627Z"}
+{"level":"info","message":"Worker ready: webhook-notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.629Z"}
+{"level":"info","message":"Worker ready: notifications","service":"virtual-wallet","timestamp":"2025-07-20T07:27:26.631Z"}
