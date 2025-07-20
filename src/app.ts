@@ -77,7 +77,7 @@ app.get('/health', (req, res) => {
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT: number = parseInt(process.env.PORT || '3200', 10);
+const PORT: number = parseInt(process.env.PORT || '3300', 10);
 
 async function startServer(): Promise<void> {
   try {

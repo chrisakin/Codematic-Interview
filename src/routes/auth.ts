@@ -47,6 +47,7 @@ router.post('/register', [
  *   post:
  *     summary: Login user
  *     tags: [Authentication]
+
  */
 router.post('/login', [
   authLimiter,
