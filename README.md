@@ -1,6 +1,19 @@
-# Virtual Wallet & Payment System
+# Codematic Interview Assessment - Multi-Provider Virtual Wallet & Payment System
 
 A comprehensive multi-provider virtual wallet and payment system built with Node.js, Express, MongoDB, and Redis. This system supports multiple payment providers (Paystack, Flutterwave, Stripe) with advanced features like fraud detection, webhooks, and background job processing.
+
+The application consists of the following folders
+- Config   
+- Controller
+- Routes
+- Dtos
+- Jobs
+- Middleware
+- Jobs
+- Providers
+- Services
+- Types
+- Utils
 
 ## 🏗️ Architecture Overview
 
@@ -298,59 +311,6 @@ Each tenant can configure multiple payment providers:
 }
 ```
 
-## 🧪 Testing
-
-### Running Tests
-```bash
-# Unit tests
-npm test
-
-# Integration tests  
-npm run test:integration
-
-# Coverage report
-npm run test:coverage
-
-# Watch mode
-npm run test:watch
-```
-
-### Test Categories
-- **Unit Tests**: Service layer and utility functions
-- **Integration Tests**: API endpoints and database operations
-- **Load Tests**: Performance and scalability testing
-- **Security Tests**: Authentication and authorization
-
-## 📊 Monitoring & Logging
-
-### Structured Logging
-- Winston logger with JSON formatting
-- Request/response logging
-- Error tracking with stack traces
-- Performance metrics
-
-### Health Checks
-```bash
-GET /health
-{
-  "status": "OK",
-  "timestamp": "2025-01-11T10:00:00.000Z",
-  "uptime": 3600,
-  "version": "1.0.0"
-}
-```
-
-### Queue Monitoring
-```bash
-GET /api/admin/queue-stats
-Authorization: Bearer <admin_token>
-{
-  "transaction": { "waiting": 0, "active": 2, "completed": 100 },
-  "webhook": { "waiting": 1, "active": 0, "failed": 2 },
-  "notification": { "waiting": 0, "active": 1, "completed": 50 }
-}
-```
-
 ## 🚀 Deployment
 
 ### Docker Deployment
@@ -361,15 +321,6 @@ docker build -t virtual-wallet .
 # Run container
 docker run -p 3000:3000 virtual-wallet
 ```
-
-### Production Considerations
-- Use environment-specific configs
-- Enable SSL/TLS encryption
-- Configure reverse proxy (nginx)
-- Set up monitoring (Prometheus, Grafana)
-- Implement log aggregation (ELK stack)
-- Database backups and replication
-- Auto-scaling configuration
 
 ### GCP Deployment
 ```yaml
@@ -407,52 +358,3 @@ const queueConfig = {
   }
 };
 ```
-
-## 🛡️ Fraud Prevention
-
-### Risk Assessment
-```javascript
-const riskFactors = {
-  transactionVelocity: 'High frequency transactions',
-  unusualAmount: 'Amount exceeds historical patterns', 
-  newDevice: 'Transaction from unknown device',
-  vpnUsage: 'VPN or proxy detected',
-  blacklistedIP: 'IP address flagged',
-  stolenCard: 'Card reported as stolen'
-};
-```
-
-### Blocking Rules
-- Automatic blocking for high-risk scores (>80)
-- Manual review for medium risk (60-80)
-- Allow with monitoring for low risk (<60)
-
-## 🎯 Future Enhancements
-
-### Planned Features
-- [ ] Multi-signature wallet support
-- [ ] Cryptocurrency integration
-- [ ] Advanced analytics dashboard
-- [ ] Machine learning fraud detection
-- [ ] Mobile SDK development
-- [ ] Multi-factor authentication
-- [ ] Compliance reporting tools
-- [ ] Advanced webhook filtering
-
-### Scalability Improvements
-- [ ] Database sharding strategy
-- [ ] Read replicas for analytics
-- [ ] CDN for static assets
-- [ ] Event sourcing implementation
-- [ ] CQRS pattern adoption
-
-## 📞 Support
-
-For technical support or questions:
-- Create an issue in the repository
-- Check the documentation at `/api-docs`
-- Review the test files for usage examples
-
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
