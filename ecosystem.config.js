@@ -28,7 +28,7 @@ module.exports = {
       listen_timeout: 10000
     },
     {
-      name: 'virtual-wallet-worker',
+      name: 'codematic-interview',
       script: 'dist/jobs/processor.js',
       instances: 2,
       exec_mode: 'cluster',
