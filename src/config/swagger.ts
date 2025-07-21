@@ -7,12 +7,12 @@ const options: swaggerJsdoc.Options = {
   definition: {
     openapi: '3.0.0',
     info: {
-      title: 'Virtual Wallet API',
+      title: 'Codematic Interview',
       version: '1.0.0',
       description: 'Multi-Provider Virtual Wallet & Payment System API',
       contact: {
         name: 'API Support',
-        email: 'support@virtualwallet.com'
+        email: 'chrisfemide@gmail.com'
       }
     },
     servers: [

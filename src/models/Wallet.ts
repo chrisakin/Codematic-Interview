@@ -35,7 +35,7 @@ const walletSchema = new Schema<IWallet>({
   },
   limits: {
     daily: {
-      amount: { type: Number, default: 500000 }, // in minor currency
+      amount: { type: Number, default: 500000 },
       used: { type: Number, default: 0 },
       lastReset: { type: Date, default: Date.now }
     },
@@ -107,7 +107,7 @@ walletSchema.methods.updateDailyUsage = function(this: IWallet, amount: number):
 
 walletSchema.methods.formatBalance = function(this: IWallet): IFormattedBalance {
   return {
-    balance: this.balance / 100, // Convert to major currency unit
+    balance: this.balance / 100, 
     ledgerBalance: this.ledgerBalance / 100,
     currency: this.currency
   };

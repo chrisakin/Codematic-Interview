@@ -245,17 +245,12 @@ export class WalletService {
       throw new AppError('Cannot transfer to the same currency wallet', 400);
     }
 
-    // Convert to minor currency unit
     const amountInMinor = Math.round(dto.amount * 100);
 
-    // Get both wallets
     const [sourceWallet, destinationWallet] = await Promise.all([
       this.getWallet(userId, tenantId, dto.fromCurrency),
       this.getWallet(userId, tenantId, dto.toCurrency)
     ]);
-
-    // For different currencies, you'd typically apply exchange rates here
-    // For simplicity, we'll transfer the same amount
     return await this.transferBetweenWalletIds(
       sourceWallet._id,
       destinationWallet._id,
@@ -263,8 +258,6 @@ export class WalletService {
       dto.description
     );
   }
-
-  // Credit wallet with optimistic locking and atomic operations
   async creditWallet(
     walletId: Types.ObjectId, 
     amount: number, 
@@ -498,7 +491,7 @@ export class WalletService {
     }
   }
 
-  // Get wallet balance from cache or database
+  // Get wallet balance
   async getWalletBalance(walletId: Types.ObjectId): Promise<IFormattedBalance> {
     try {
       const cacheKey = `wallet_balance:${walletId}`;

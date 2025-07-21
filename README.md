@@ -38,7 +38,7 @@ A comprehensive multi-provider virtual wallet and payment system built with Node
 1. **Clone the repository**
 ```bash
 git clone <repository-url>
-cd virtual-wallet-system
+cd codematic-interview
 ```
 
 2. **Install dependencies**
@@ -65,10 +65,9 @@ npm run dev
 ```
 
 5. **Access the application**
-- API: http://localhost:3000
-- Swagger Docs: http://localhost:3000/api-docs
-- MongoDB UI: http://localhost:8081 (admin/admin123)
-- Redis UI: http://localhost:8082
+- API: http://localhost:3003
+- Swagger Docs: http://localhost:3003/api-docs
+
 
 ## 📖 API Documentation
 

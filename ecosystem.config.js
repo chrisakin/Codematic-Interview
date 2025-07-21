@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'virtual-wallet-api',
+      name: 'codematic-interview',
       script: 'dist/app.js',
       instances: 'max',
       exec_mode: 'cluster',

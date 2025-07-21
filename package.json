@@ -1,5 +1,5 @@
 {
-  "name": "virtual-wallet-system",
+  "name": "codematic-interview",
   "version": "1.0.0",
   "description": "Multi-Provider Virtual Wallet & Payment System",
   "main": "src/app.js",

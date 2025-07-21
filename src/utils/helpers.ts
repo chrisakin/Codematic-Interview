@@ -14,7 +14,7 @@ export const convertCurrency = (
     return amount;
   }
   
-  const rates = APP_CONSTANTS.CURRENCY_RATES[fromCurrency];
+  const rates: any = APP_CONSTANTS.CURRENCY_RATES[fromCurrency];
   if (!rates || !rates[toCurrency]) {
     throw new Error(`Conversion rate not available for ${fromCurrency} to ${toCurrency}`);
   }

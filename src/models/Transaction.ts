@@ -45,8 +45,6 @@ const transactionSchema = new Schema<ITransaction>({
     required: true,
     maxlength: 255
   },
-  
-  // Wallet references for different transaction types
   sourceWallet: {
     type: Schema.Types.ObjectId,
     ref: 'Wallet'
@@ -55,8 +53,7 @@ const transactionSchema = new Schema<ITransaction>({
     type: Schema.Types.ObjectId,
     ref: 'Wallet'
   },
-  
-  // Provider information
+
   provider: {
     type: String,
     enum: ['paystack', 'flutterwave', 'stripe', 'internal']
@@ -64,33 +61,28 @@ const transactionSchema = new Schema<ITransaction>({
   providerReference: String,
   providerResponse: Schema.Types.Mixed,
   
-  // Payment method details
   paymentMethod: {
     type: String,
     enum: ['card', 'bank_transfer', 'mobile_money', 'virtual_account', 'wallet']
   },
   paymentDetails: Schema.Types.Mixed,
   
-  // Fees and charges
   fees: {
     platform: { type: Number, default: 0 },
     provider: { type: Number, default: 0 },
     total: { type: Number, default: 0 }
   },
   
-  // Metadata and tracking
   metadata: Schema.Types.Mixed,
   clientIp: String,
   userAgent: String,
   
-  // Idempotency
   idempotencyKey: {
     type: String,
     sparse: true,
     index: true
   },
-  
-  // Webhook and notification status
+
   webhookStatus: {
     type: String,
     enum: ['pending', 'sent', 'failed'],
@@ -102,20 +94,17 @@ const transactionSchema = new Schema<ITransaction>({
   },
   webhookLastAttempt: Date,
   
-  // Fraud detection
   riskScore: {
     type: Number,
     min: 0,
     max: 100
   },
   fraudFlags: [String],
-  
-  // Timing
+
   processedAt: Date,
   failedAt: Date,
   cancelledAt: Date,
   
-  // Parent transaction for refunds/reversals
   parentTransaction: {
     type: Schema.Types.ObjectId,
     ref: 'Transaction'
@@ -152,7 +141,6 @@ transactionSchema.virtual('formattedAmount').get(function(this: ITransaction): I
   };
 });
 
-// Methods
 transactionSchema.methods.canBeProcessed = function(this: ITransaction): boolean {
   return this.status === 'pending';
 };
@@ -184,7 +172,6 @@ transactionSchema.methods.incrementWebhookAttempt = function(this: ITransaction)
   }
 };
 
-// Static methods
 transactionSchema.statics.generateReference = function(prefix: string = 'TXN'): string {
   const timestamp = Date.now().toString(36);
   const random = Math.random().toString(36).substr(2, 9);

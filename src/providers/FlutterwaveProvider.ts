@@ -95,7 +95,7 @@ class FlutterwaveProvider implements IPaymentProvider {
       return {
         reference: transaction.tx_ref,
         status: transaction.status === 'successful' ? 'completed' : 'failed',
-        amount: transaction.amount * 100, // Convert back to minor currency unit
+        amount: transaction.amount * 100,
         currency: transaction.currency,
         paidAt: transaction.created_at,
         channel: transaction.payment_type,
